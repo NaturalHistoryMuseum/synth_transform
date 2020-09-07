@@ -1,2 +1,5 @@
 .idea
 venv
+config.yml
+synth.egg-info
+__pycache__
