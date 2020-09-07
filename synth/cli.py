@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 import click
+import click_pathlib
 import yaml
 
 
@@ -68,7 +69,7 @@ def get_here():
 
 @click.group()
 @click.option('-c', '--config', envvar='SYNTH_CONFIG', callback=setup_and_bind, expose_value=False,
-              is_eager=True, show_default='config.yml in project root', type=click.Path())
+              is_eager=True, show_default='config.yml in project root', type=click_pathlib.Path())
 def synth():
     pass
 
@@ -76,14 +77,13 @@ def synth():
 @synth.command()
 @click.option('-f', '--filename', default=lambda: get_here() / 'model' / 'rco_synthsys_live.py',
               help='output filename', show_default='synth/model/rco_synthsys_live.py',
-              type=click.Path())
+              type=click_pathlib.Path())
 @click.pass_obj
 def generate(config, filename):
     """
     Generates a new SQLAlchemy model for the original Synthesys databases and outputs it to the
     given optional filename. The code is generated using sqlacodegen.
     """
-    filename = Path(filename)
     click.secho(f'Generating the model for source synth databases... ', fg='yellow', nl=False)
     with open(filename, 'w') as f:
         subprocess.call(['sqlacodegen', f'{config.sources[-1]}'], stdout=f)

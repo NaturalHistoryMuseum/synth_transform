@@ -7,6 +7,7 @@ setup(
     py_modules=['yourscript'],
     install_requires=[
         'click~=7.1.2',
+        'click-pathlib~=2020.3.13.0',
         'mysqlclient~=2.0.1',
         'PyYAML~=5.3.1',
         'sqlacodegen~=2.3.0',
@@ -17,3 +18,4 @@ setup(
         synth=synth.cli:synth
     ''',
 )
+
