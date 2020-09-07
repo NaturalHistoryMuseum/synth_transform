@@ -29,7 +29,7 @@ cause it uses a MySQL C library under the hood.
 Check out [the pip page](https://pypi.org/project/mysqlclient/) for some support.
 
 _If this library is an issue to install on Windows we may need to use
-[PyMySQL](https://pypi.org/project/PyMySQL/).
+[PyMySQL](https://pypi.org/project/PyMySQL/)._
 
 
 ### Setup
