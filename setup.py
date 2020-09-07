@@ -14,6 +14,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        synth=cli:synth
+        synth=synth.cli:synth
     ''',
 )
