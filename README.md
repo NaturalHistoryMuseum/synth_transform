@@ -104,3 +104,12 @@ Generates a new SQLAlchemy model for the original Synthesys schemas and outputs 
 optional filename.
 The code is generated using sqlacodegen.
 The Synthesys 4 schema is used although they all have the same schema so it doesn't really matter!
+
+
+## Supplementary Data
+In the `data` directory there are some supplementary files which are listed below along with their
+source.
+
+| file | source |
+| ---- | ------ |
+| `master_clean.json` | This file comes from [https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json](https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json) and provides a mapping between some dirty Synthesys place data and clean versions of places. |
