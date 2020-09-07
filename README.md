@@ -88,11 +88,11 @@ Commands:
 A config file is required to do anything.
 There are 3 ways of providing the path to the YAML file;
 
-    - don't do anything and it will be assumed that there is a file called `config.yml` in the
-      current working directory
-    - provide the file path using the `-c` or `--config` option, e.g. `synth -c config.yml`
-    - provide the file path using the config environment variable `SYNTH_CONFIG`, e.g.
-      `export SYNTH_CONFIG=config.yml`
+  - don't do anything and it will be assumed that there is a file called `config.yml` in the
+    current working directory
+  - provide the file path using the `-c` or `--config` option, e.g. `synth -c config.yml`
+  - provide the file path using the config environment variable `SYNTH_CONFIG`, e.g.
+    `export SYNTH_CONFIG=config.yml`
 
 ### Commands
 #### `generate`
