@@ -51,18 +51,15 @@ Here's an example configuration file:
 ```yaml
 ---
 
-# base database URL, must not end in a slash!
-base: mysql://USERNAME:PASSWORD@HOST
-
-# the names of the source schemas, must be in chronological order
+# the database URLs of the source schemas, must be in chronological order
 sources:
-  - rco_synthesys_live
-  - rco_synthesys2_live
-  - rco_synthesys3_live
-  - rco_synthesys4_live
+  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys_live
+  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys2_live
+  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys3_live
+  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys4_live
 
-# the name of the analysis schema
-target: synth_analysis
+# the database URL of the analysis schema
+target: mysql://USERNAME:PASSWORD@HOST/synth_analysis
 ```
 
 ## Usage

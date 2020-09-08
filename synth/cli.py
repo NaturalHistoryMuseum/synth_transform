@@ -12,24 +12,13 @@ class Config:
     run.
     """
 
-    @classmethod
-    def create(cls, config_path):
+    def __init__(self, sources, target):
         """
-        Creates a new Config object using the YAML at the given path.
-
-        :param config_path: the path to the config file
-        :return: an instantiated Config object
+        :param sources: the database URLs of the source schemas, must be in chronological order
+        :param target: the database URL of the schema to output to
         """
-
-    def __init__(self, base, sources, target):
-        """
-        :param base: the base database URL for all source and target schemas
-        :param sources: the names of the source schemas, must be in chronological order
-        :param target: the name of the schema to output to
-        """
-        self.base = base
-        self.sources = [f'{base}/{source}' for source in sources]
-        self.target = f'{base}/{target}'
+        self.sources = sources
+        self.target = target
 
 
 def setup(config_path=None):
