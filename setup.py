@@ -12,6 +12,7 @@ setup(
         'PyYAML~=5.3.1',
         'sqlacodegen~=2.3.0',
         'SQLAlchemy~=1.3.19',
+        'sqlalchemy-utils~=0.36.8',
     ],
     entry_points='''
         [console_scripts]

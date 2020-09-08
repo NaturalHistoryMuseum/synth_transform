@@ -5,6 +5,8 @@ import click
 import click_pathlib
 import yaml
 
+from synth import etl
+
 
 class Config:
     """
@@ -79,6 +81,18 @@ def generate(config, filename):
     click.secho(f'Done', fg='green')
 
 
+@synth.command()
+@click.pass_obj
+def rebuild(config):
+    """
+    Drops the target database and then rebuilds it using the analysis model.
+    """
+    etl.drop_analysis_db(config)
+    etl.create_analysis_db(config)
+
+
 if __name__ == '__main__':
     # for dev!
-    generate(obj=setup())
+    # generate(obj=setup())
+    # rebuild(obj=setup())
+    pass
