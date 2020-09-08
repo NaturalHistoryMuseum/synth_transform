@@ -1,5 +1,6 @@
 import subprocess
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -60,7 +61,7 @@ def get_here():
 
 
 @contextmanager
-def task(message, done='Done'):
+def task(message, done='Done', time=True):
     """
     Handy context manager for printing basic info about the start and end of a task. The message
     passed is printed in yellow first with "... " appended and then the context manager yields. When
@@ -68,9 +69,14 @@ def task(message, done='Done'):
 
     :param message: the task message
     :param done: the done message
+    :param time: whether to time the execution and print it as part of the done message
     """
     click.secho(f'{message}... ', fg='yellow', nl=False)
+    start = datetime.now()
     yield
+    end = datetime.now()
+    if time:
+        done = f'{done} [took {end - start}]'
     click.secho(done, fg='green')
 
 
