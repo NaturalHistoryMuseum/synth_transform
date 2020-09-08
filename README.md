@@ -22,16 +22,6 @@ Then make sure you activate the environment:
 source venv/bin/activate
 ```
 
-
-### MySQL Python Driver
-The MySQL Python driver we're using is `mysqlclient` which requires some additional OS libraries
-cause it uses a MySQL C library under the hood.
-Check out [the pip page](https://pypi.org/project/mysqlclient/) for some support.
-
-_If this library is an issue to install on Windows we may need to use
-[PyMySQL](https://pypi.org/project/PyMySQL/)._
-
-
 ### Setup
 Once you've got your environment setup you can install the dependencies and CLI.
 To do this run:
@@ -53,13 +43,13 @@ Here's an example configuration file:
 
 # the database URLs of the source schemas, must be in chronological order
 sources:
-  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys_live
-  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys2_live
-  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys3_live
-  - mysql://USERNAME:PASSWORD@HOST/rco_synthesys4_live
+  - mysql+pymysql://USERNAME:PASSWORD@HOST/rco_synthesys_live
+  - mysql+pymysql://USERNAME:PASSWORD@HOST/rco_synthesys2_live
+  - mysql+pymysql://USERNAME:PASSWORD@HOST/rco_synthesys3_live
+  - mysql+pymysql://USERNAME:PASSWORD@HOST/rco_synthesys4_live
 
 # the database URL of the analysis schema
-target: mysql://USERNAME:PASSWORD@HOST/synth_analysis
+target: mysql+pymysql://USERNAME:PASSWORD@HOST/synth_analysis
 ```
 
 ## Usage

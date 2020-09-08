@@ -8,7 +8,7 @@ setup(
     install_requires=[
         'click~=7.1.2',
         'click-pathlib~=2020.3.13.0',
-        'mysqlclient~=2.0.1',
+        'pymysql~=0.10.0',
         'PyYAML~=5.3.1',
         'sqlacodegen~=2.3.0',
         'SQLAlchemy~=1.3.19',
