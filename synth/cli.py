@@ -1,4 +1,5 @@
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -58,6 +59,21 @@ def get_here():
     return Path(__file__).parent
 
 
+@contextmanager
+def task(message, done='Done'):
+    """
+    Handy context manager for printing basic info about the start and end of a task. The message
+    passed is printed in yellow first with "... " appended and then the context manager yields. When
+    the context collapses the passed done message is printed in green.
+
+    :param message: the task message
+    :param done: the done message
+    """
+    click.secho(f'{message}... ', fg='yellow', nl=False)
+    yield
+    click.secho(done, fg='green')
+
+
 @click.group()
 @click.option('-c', '--config', envvar='SYNTH_CONFIG', callback=setup_and_bind, expose_value=False,
               is_eager=True, show_default='config.yml in project root', type=click_pathlib.Path())
@@ -75,10 +91,9 @@ def generate(config, filename):
     Generates a new SQLAlchemy model for the original Synthesys databases and outputs it to the
     given optional filename. The code is generated using sqlacodegen.
     """
-    click.secho(f'Generating the model for source synth databases... ', fg='yellow', nl=False)
-    with open(filename, 'w') as f:
-        subprocess.call(['sqlacodegen', f'{config.sources[-1]}'], stdout=f)
-    click.secho(f'Done', fg='green')
+    with task('Generating the model for source synth databases'):
+        with open(filename, 'w') as f:
+            subprocess.call(['sqlacodegen', f'{config.sources[-1]}'], stdout=f)
 
 
 @synth.command()
@@ -87,8 +102,10 @@ def rebuild(config):
     """
     Drops the target database and then rebuilds it using the analysis model.
     """
-    etl.drop_analysis_db(config)
-    etl.create_analysis_db(config)
+    with task('Dropping existing database target if necessary'):
+        etl.drop_analysis_db(config)
+    with task('Creating new target database using model'):
+        etl.create_analysis_db(config)
 
 
 if __name__ == '__main__':
