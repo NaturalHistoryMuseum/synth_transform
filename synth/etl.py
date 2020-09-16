@@ -71,8 +71,9 @@ class FillRoundTable(Step):
 
     def _run(self, target, *synth_sources):
         """
-        Create the Round objects and save them into the analysis database. Note that we force the
-        ids to match the synth round for ease of use elsewhere.
+        Fill the Round table with data from the NHM_Call tables in each of the synth sources.
+        Notes:
+            - we force the ids of each Round to match the synth round for ease of use elsewhere
         """
         for synth_round, source in enumerate(synth_sources, start=1):
             # find the minimum call open time on this db
@@ -90,6 +91,12 @@ class FillCallTable(Step):
         return 'Fill Call table with data'
 
     def _run(self, target, *synth_sources):
+        """
+        Fill the Call table with data from the NHM_Call tables in each of the synth sources.
+        Notes:
+            - the Call ids are generated using an offset to make it easier to map them in other
+              places. The offset is calculated like so: (offset * synth_round) + NHM_Call.callID.
+        """
         offset = 100
         for synth_round, source in enumerate(synth_sources, start=1):
             # TODO: is the call column ordered correctly? Should we order on date instead? Does it
