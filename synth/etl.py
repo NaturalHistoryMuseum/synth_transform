@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.model import analysis
+from synth.model.analysis import Round
 from synth.utils import Step
 
 
@@ -19,8 +20,9 @@ def get_steps(config, with_data=True):
         CreateAnalysisDB(config),
     ]
     if with_data:
-        pass
-        # steps.append(more)
+        steps.extend([
+            FillRoundTable(config),
+        ])
 
     return steps
 
@@ -56,3 +58,17 @@ class CreateAnalysisDB(Step):
         analysis.Base.metadata.create_all(engine)
 
 
+class FillRoundTable(Step):
+    """
+    Fills the Round table with the synth round data.
+    """
+
+    @property
+    def message(self):
+        return 'Filling round table with data'
+
+    def run(self):
+        with self.config.target_session() as session:
+            session.add_all([
+                Round(id=number, name=f'Synthesys {number}') for number in range(1, 5)
+            ])

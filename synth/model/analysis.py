@@ -9,6 +9,13 @@ metadata = Base.metadata
 # TODO: using Text instead of String(#) (varchar) cause why not
 
 
+class Round(Base):
+    __tablename__ = 'Round'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(Text)
+
+
 class Call(Base):
     __tablename__ = 'Call'
 

@@ -4,6 +4,8 @@ from datetime import datetime
 
 import click
 import yaml
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 class Config:
@@ -19,6 +21,21 @@ class Config:
         """
         self.sources = sources
         self.target = target
+
+        self._target_engine = create_engine(self.target)
+        self._target_session = sessionmaker(bind=self._target_engine)
+
+    @contextmanager
+    def target_session(self):
+        session = self._target_session()
+        try:
+            yield session
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
 
 
 def setup(config_path):
