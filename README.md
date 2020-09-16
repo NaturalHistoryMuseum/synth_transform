@@ -92,6 +92,16 @@ optional filename.
 The code is generated using sqlacodegen.
 The Synthesys 4 schema is used although they all have the same schema so it doesn't really matter!
 
+#### `rebuild`
+```bash
+synth rebuild
+```
+
+Performs the actual transfer of data from the source Synthesys databases to the target analyitics
+database.
+To do this it drops and recreates all the tables in the analytics database and then runs a series of
+steps to copy the data over, transforming it as it goes.
+
 
 ## Supplementary Data
 In the `data` directory there are some supplementary files which are listed below along with their
