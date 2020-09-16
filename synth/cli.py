@@ -109,7 +109,7 @@ def rebuild(config):
     Drops the target database and then rebuilds it using the analysis model.
     """
     with task('Dropping existing database target if necessary'):
-        etl.drop_analysis_db(config)
+        etl.clear_analysis_db(config)
     with task('Creating new target database using model'):
         etl.create_analysis_db(config)
 
