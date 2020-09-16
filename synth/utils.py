@@ -22,12 +22,31 @@ class Config:
         self.sources = sources
         self.target = target
 
+        self._source_engines = [create_engine(source) for source in self.sources]
+        self.source_sessions = [sessionmaker(bind=engine)() for engine in self._source_engines]
+
         self._target_engine = create_engine(self.target)
-        self._target_session = sessionmaker(bind=self._target_engine)
+        self._target_session_maker = sessionmaker(bind=self._target_engine)
+
+    @property
+    def synth1(self):
+        return self.source_sessions[0]
+
+    @property
+    def synth2(self):
+        return self.source_sessions[1]
+
+    @property
+    def synth3(self):
+        return self.source_sessions[2]
+
+    @property
+    def synth4(self):
+        return self.source_sessions[3]
 
     @contextmanager
     def target_session(self):
-        session = self._target_session()
+        session = self._target_session_maker()
         try:
             yield session
             session.commit()
