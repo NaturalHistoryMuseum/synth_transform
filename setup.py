@@ -4,7 +4,7 @@ from setuptools import setup
 setup(
     name='synth',
     version='0.1',
-    py_modules=['yourscript'],
+    py_modules=['synth'],
     install_requires=[
         'click~=7.1.2',
         'click-pathlib~=2020.3.13.0',
@@ -19,4 +19,3 @@ setup(
         synth=synth.cli:synth
     ''',
 )
-
