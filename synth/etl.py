@@ -1,8 +1,9 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.model import analysis
 from synth.model.analysis import Round
+from synth.model.rco_synthsys_live import t_NHM_Call
 from synth.utils import Step
 
 
@@ -68,7 +69,15 @@ class FillRoundTable(Step):
         return 'Filling round table with data'
 
     def run(self):
+        """
+        Create the Round objects and save them into the analysis database. Note that we force the
+        ids to match the synth round for ease of use elsewhere.
+        """
         with self.config.target_session() as session:
-            session.add_all([
-                Round(id=number, name=f'Synthesys {number}') for number in range(1, 5)
-            ])
+            for number, source_db in enumerate(self.config.source_sessions, start=1):
+                # find the minimum call open time on this db
+                start = source_db.query(func.min(t_NHM_Call.c.dateOpen)).scalar()
+                # and the maximum call close time on this db
+                end = source_db.query(func.max(t_NHM_Call.c.dateClosed)).scalar()
+                # then create a new Round object in the target session
+                session.add(Round(id=number, name=f'Synthesys {number}', start=start, end=end))

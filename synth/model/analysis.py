@@ -14,6 +14,8 @@ class Round(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(Text)
+    start = Column(DateTime)
+    end = Column(DateTime)
 
 
 class Call(Base):
