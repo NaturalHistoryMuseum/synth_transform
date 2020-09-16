@@ -37,7 +37,7 @@ class ClearAnalysisDB(Step):
     def message(self):
         return 'Dropping tables in target database (if necessary)'
 
-    def run(self):
+    def _run(self, *args, **kwargs):
         if database_exists(self.config.target):
             engine = create_engine(self.config.target)
             analysis.Base.metadata.drop_all(engine)
@@ -52,7 +52,7 @@ class CreateAnalysisDB(Step):
     def message(self):
         return 'Creating new target database using model (if necessary)'
 
-    def run(self):
+    def _run(self, *args, **kwargs):
         if not database_exists(self.config.target):
             create_database(self.config.target)
         engine = create_engine(self.config.target)
@@ -68,16 +68,15 @@ class FillRoundTable(Step):
     def message(self):
         return 'Filling round table with data'
 
-    def run(self):
+    def _run(self, target, *synth_sources):
         """
         Create the Round objects and save them into the analysis database. Note that we force the
         ids to match the synth round for ease of use elsewhere.
         """
-        with self.target_session() as session:
-            for number, source in self.synth_sources():
-                # find the minimum call open time on this db
-                start = source.query(func.min(t_NHM_Call.c.dateOpen)).scalar()
-                # and the maximum call close time on this db
-                end = source.query(func.max(t_NHM_Call.c.dateClosed)).scalar()
-                # then create a new Round object in the target session
-                session.add(Round(id=number, name=f'Synthesys {number}', start=start, end=end))
+        for number, source in enumerate(synth_sources, start=1):
+            # find the minimum call open time on this db
+            start = source.query(func.min(t_NHM_Call.c.dateOpen)).scalar()
+            # and the maximum call close time on this db
+            end = source.query(func.max(t_NHM_Call.c.dateClosed)).scalar()
+            # then create a new Round object in the target session
+            target.add(Round(id=number, name=f'Synthesys {number}', start=start, end=end))

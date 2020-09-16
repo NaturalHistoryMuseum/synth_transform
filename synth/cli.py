@@ -49,8 +49,7 @@ def rebuild(config, with_data):
     Drops the target database and then rebuilds it using the analysis model.
     """
     for step in get_steps(config, with_data):
-        with task(step.message):
-            step.run()
+        step.run()
 
 
 if __name__ == '__main__':

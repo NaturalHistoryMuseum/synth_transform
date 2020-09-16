@@ -76,70 +76,6 @@ class Step(abc.ABC):
     def __init__(self, config):
         self.config = config
 
-        self._source_sessions = [
-            sessionmaker(bind=engine)() for engine in self.config.source_engines
-        ]
-        self._target_session_maker = sessionmaker(bind=self.config.target_engine)
-
-    @property
-    def synth1(self):
-        """
-        Returns a Session object for the synth 1 database. Note that these are created for each Step
-        object and not shared between steps.
-
-        :return: Session object
-        """
-        return self._source_sessions[0]
-
-    @property
-    def synth2(self):
-        """
-        Returns a Session object for the synth 2 database. Note that these are created for each Step
-        object and not shared between steps.
-
-        :return: Session object
-        """
-        return self._source_sessions[1]
-
-    @property
-    def synth3(self):
-        """
-        Returns a Session object for the synth 3 database. Note that these are created for each Step
-        object and not shared between steps.
-
-        :return: Session object
-        """
-        return self._source_sessions[2]
-
-    @property
-    def synth4(self):
-        """
-        Returns a Session object for the synth 4 database. Note that these are created for each Step
-        object and not shared between steps.
-
-        :return: Session object
-        """
-        return self._source_sessions[3]
-
-    @contextmanager
-    def target_session(self):
-        """
-        Context manager for a session on the target database. Yields an active, new session ready
-        for use and once returned to, commits the session and then closes it. If any errors occur
-        when committing or indeed during use, a rollback is issued and the exception is raised.
-
-        :return: a Session object on the target database
-        """
-        session = self._target_session_maker()
-        try:
-            yield session
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            raise e
-        finally:
-            session.close()
-
     @property
     @abc.abstractmethod
     def message(self):
@@ -151,18 +87,34 @@ class Step(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     def run(self):
         """
-        Run the task.
+        Runs the step.
+        """
+        source_sessions = [sessionmaker(bind=engine)() for engine in self.config.source_engines]
+        target_session = sessionmaker(bind=self.config.target_engine)()
+
+        with task(self.message):
+            try:
+                self._run(target_session, *source_sessions)
+                target_session.commit()
+            except Exception as e:
+                target_session.rollback()
+                raise e
+            finally:
+                for source_session in source_sessions:
+                    source_session.close()
+                target_session.close()
+
+    @abc.abstractmethod
+    def _run(self, target, synth1, synth2, synth3, synth4):
+        """
+        Abstract function to be overwritten with actual step logic.
+
+        :param target: a Session object for the target database
+        :param synth1: a Session object for the synth 1 database
+        :param synth2: a Session object for the synth 2 database
+        :param synth3: a Session object for the synth 3 database
+        :param synth4: a Session object for the synth 4 database
         """
         pass
-
-    def synth_sources(self):
-        """
-        Generator yielding the a 2-tuple made up of (number, session) for each synth source
-        database, in order (i.e. (1, synth1 session), (2, synth2 session) ...).
-
-        :return: a generator yielding 2-tuples made up of (number, session)
-        """
-        yield from enumerate(self._source_sessions, start=1)
