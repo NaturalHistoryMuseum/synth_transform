@@ -5,6 +5,26 @@ from synth.model import analysis
 from synth.utils import Step
 
 
+def get_steps(config, with_data=True):
+    """
+    Returns the ETL steps. If the with_data flag is passed as False then the data transform are
+    omitted and the tables are simply dropped and recreated.
+
+    :param config: the Config object
+    :param with_data: whether to transfer the data over too (default: True)
+    :return: a list of ordered steps to perform the requested ETL
+    """
+    steps = [
+        ClearAnalysisDB(config),
+        CreateAnalysisDB(config),
+    ]
+    if with_data:
+        pass
+        # steps.append(more)
+
+    return steps
+
+
 class ClearAnalysisDB(Step):
     """
     This step drops all tables from the analysis database, if there is one.
@@ -36,13 +56,3 @@ class CreateAnalysisDB(Step):
         analysis.Base.metadata.create_all(engine)
 
 
-def get_steps(config, with_data=True):
-    steps = [
-        ClearAnalysisDB(config),
-        CreateAnalysisDB(config),
-    ]
-    if with_data:
-        pass
-        # steps.append(more)
-
-    return steps
