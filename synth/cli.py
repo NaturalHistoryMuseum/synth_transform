@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 import click_pathlib
 
-from synth import etl
+from synth.etl import get_steps
 from synth.utils import setup_and_bind, task
 
 
@@ -40,15 +40,16 @@ def generate(config, filename):
 
 
 @synth.command()
+@click.option('--with-data/--without-data', default=True,
+              help='Copy the data from the source to the target')
 @click.pass_obj
-def rebuild(config):
+def rebuild(config, with_data):
     """
     Drops the target database and then rebuilds it using the analysis model.
     """
-    with task('Dropping existing database target if necessary'):
-        etl.clear_analysis_db(config)
-    with task('Creating new target database using model'):
-        etl.create_analysis_db(config)
+    for step in get_steps(config, with_data):
+        with task(step.message):
+            step.run()
 
 
 if __name__ == '__main__':

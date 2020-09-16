@@ -2,18 +2,47 @@ from sqlalchemy import create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.model import analysis
+from synth.utils import Step
 
 
-def clear_analysis_db(config):
-    if database_exists(config.target):
-        engine = create_engine(config.target)
-        for table in reversed(analysis.metadata.sorted_tables):
-            table.drop(engine)
+class ClearAnalysisDB(Step):
+    """
+    This step drops all tables from the analysis database, if there is one.
+    """
+
+    @property
+    def message(self):
+        return 'Dropping tables in target database (if necessary)'
+
+    def run(self):
+        if database_exists(self.config.target):
+            engine = create_engine(self.config.target)
+            analysis.Base.metadata.drop_all(engine)
 
 
-def create_analysis_db(config):
-    if not database_exists(config.target):
-        create_database(config.target)
+class CreateAnalysisDB(Step):
+    """
+    This step creates all tables for the analysis database, if the database doesn't already exist.
+    """
 
-    engine = create_engine(config.target)
-    analysis.Base.metadata.create_all(engine)
+    @property
+    def message(self):
+        return 'Creating new target database using model (if necessary)'
+
+    def run(self):
+        if not database_exists(self.config.target):
+            create_database(self.config.target)
+        engine = create_engine(self.config.target)
+        analysis.Base.metadata.create_all(engine)
+
+
+def get_steps(config, with_data=True):
+    steps = [
+        ClearAnalysisDB(config),
+        CreateAnalysisDB(config),
+    ]
+    if with_data:
+        pass
+        # steps.append(more)
+
+    return steps

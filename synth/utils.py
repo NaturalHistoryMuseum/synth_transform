@@ -1,3 +1,4 @@
+import abc
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -60,3 +61,30 @@ def task(message, done='Done', time=True):
     if time:
         done = f'{done} [took {end - start}]'
     click.secho(done, fg='green')
+
+
+class Step(abc.ABC):
+    """
+    This class represents a step in the ETL process.
+    """
+
+    def __init__(self, config):
+        self.config = config
+
+    @property
+    @abc.abstractmethod
+    def message(self):
+        """
+        This is the message used for the task output, indicating to users what is currently
+        happening.
+
+        :return: a string message (this will be passed directly to the task context manager above
+        """
+        pass
+
+    @abc.abstractmethod
+    def run(self):
+        """
+        Run the task.
+        """
+        pass
