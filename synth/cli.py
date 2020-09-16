@@ -19,7 +19,8 @@ def get_here():
 
 @click.group()
 @click.option('-c', '--config', envvar='SYNTH_CONFIG', callback=setup_and_bind, expose_value=False,
-              is_eager=True, show_default='config.yml in project root', type=click_pathlib.Path())
+              is_eager=True, show_default='config.yml in project root', type=click_pathlib.Path(),
+              default=lambda: get_here().parent / 'config.yml')
 def synth():
     pass
 
