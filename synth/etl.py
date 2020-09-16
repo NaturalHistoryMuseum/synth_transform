@@ -35,7 +35,7 @@ class ClearAnalysisDB(Step):
 
     @property
     def message(self):
-        return 'Dropping tables in target database (if necessary)'
+        return 'Drop tables in target database (if necessary)'
 
     def _run(self, *args, **kwargs):
         if database_exists(self.config.target):
@@ -50,7 +50,7 @@ class CreateAnalysisDB(Step):
 
     @property
     def message(self):
-        return 'Creating new target database using model (if necessary)'
+        return 'Create new target database using model (if necessary)'
 
     def _run(self, *args, **kwargs):
         if not database_exists(self.config.target):
@@ -66,7 +66,7 @@ class FillRoundTable(Step):
 
     @property
     def message(self):
-        return 'Filling round table with data'
+        return 'Fill round table with data'
 
     def _run(self, target, *synth_sources):
         """
