@@ -1,5 +1,5 @@
 # coding: utf-8
-from sqlalchemy import Column, DECIMAL, DateTime, Integer, Text, Boolean, String
+from sqlalchemy import Column, DECIMAL, DateTime, Integer, Text, Boolean, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -19,10 +19,8 @@ class Round(Base):
 class Call(Base):
     __tablename__ = 'Call'
 
-    # rename: callID -> id, made primary key
-    # TODO: this is nullable in Sarah's sheet, can we fill in the ones that don't have an ID?
     id = Column(Integer, primary_key=True)
-    call = Column(Integer)
+    round = Column(Integer, ForeignKey('Round.id'))
     dateOpen = Column(DateTime)
     dateClosed = Column(DateTime)
 
