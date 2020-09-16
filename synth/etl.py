@@ -99,8 +99,8 @@ class FillCallTable(Step):
         """
         offset = 100
         for synth_round, source in enumerate(synth_sources, start=1):
-            # TODO: is the call column ordered correctly? Should we order on date instead? Does it
-            #       even matter?
+            # we order by NHM_Call.call but could easily use NHM_Call.dateOpen as they produce the
+            # same order
             for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
                 # TODO: do we want to use the call.callID or start from 1?
                 call_id = (offset * synth_round) + call.callID
