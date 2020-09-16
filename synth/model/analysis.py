@@ -23,8 +23,8 @@ class Call(Base):
 
     id = Column(Integer, primary_key=True)
     round = Column(Integer, ForeignKey('Round.id'))
-    dateOpen = Column(DateTime)
-    dateClosed = Column(DateTime)
+    start = Column(DateTime)
+    end = Column(DateTime)
 
 
 class Country(Base):
