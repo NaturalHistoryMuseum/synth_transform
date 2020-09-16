@@ -30,9 +30,9 @@ class Call(Base):
 class Country(Base):
     __tablename__ = 'Country'
 
-    # reorder cause it's nice to have the pk first (at least I like it!)
-    countryCode = Column(String(2), primary_key=True)
-    countryName = Column(Text)
+    id = Column(Integer, primary_key=True)
+    code = Column(String(2))
+    name = Column(Text)
 
 
 class Discipline(Base):
