@@ -1,6 +1,5 @@
 from setuptools import setup
 
-
 setup(
     name='synth',
     version='0.1',
@@ -8,6 +7,7 @@ setup(
     install_requires=[
         'click~=7.1.2',
         'click-pathlib~=2020.3.13.0',
+        'pycountry~=20.7.3',
         'pymysql~=0.10.0',
         'PyYAML~=5.3.1',
         'sqlacodegen~=2.3.0',
