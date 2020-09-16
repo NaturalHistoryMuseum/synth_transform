@@ -3,8 +3,8 @@ from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.model import analysis
-from synth.model.analysis import Round, Call, Country
-from synth.model.rco_synthsys_live import t_NHM_Call
+from synth.model.analysis import Round, Call, Country, Discipline
+from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline
 from synth.utils import Step
 
 
@@ -26,6 +26,7 @@ def get_steps(config, with_data=True):
             FillRoundTable(config),
             FillCallTable(config),
             FillCountryTable(config),
+            FillDisciplineTable(config),
         ])
 
     return steps
@@ -121,7 +122,25 @@ class FillCountryTable(Step):
         Fill the Country table with data from pycountry which is a library that wraps the most
         recent ISO databases for various country and language packages.
         """
-        # a the new Country objects to the target session
+        # add the new Country objects to the target session
         target.add_all([
             Country(code=country.alpha_2, name=country.name) for country in pycountry.countries
         ])
+
+
+class FillDisciplineTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Discipline table with data'
+
+    def _run(self, target, synth4, *args):
+        """
+        Fill the Discipline table with data from the NHM_Discipline table.
+        Notes:
+            - All databases have the same data in this table so we can just copy the synth 4 data
+              and ignore the synth 1-3 NHM_Discipline data.
+        """
+        # add the new Discipline objects to the target session
+        for discipline in synth4.query(NHMDiscipline).order_by(NHMDiscipline.DisciplineID.asc()):
+            target.add(Discipline(id=discipline.DisciplineID, name=discipline.DisciplineName))

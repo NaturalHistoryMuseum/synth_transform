@@ -39,7 +39,7 @@ class Discipline(Base):
     __tablename__ = 'Discipline'
 
     id = Column(Integer, primary_key=True)
-    disciplineName = Column(Text)
+    name = Column(Text)
 
 
 class Evaluation(Base):
