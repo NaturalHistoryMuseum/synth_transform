@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.model import analysis
-from synth.model.analysis import Round
+from synth.model.analysis import Round, Call
 from synth.model.rco_synthsys_live import t_NHM_Call
 from synth.utils import Step
 
@@ -23,6 +23,7 @@ def get_steps(config, with_data=True):
     if with_data:
         steps.extend([
             FillRoundTable(config),
+            FillCallTable(config),
         ])
 
     return steps
@@ -73,10 +74,28 @@ class FillRoundTable(Step):
         Create the Round objects and save them into the analysis database. Note that we force the
         ids to match the synth round for ease of use elsewhere.
         """
-        for number, source in enumerate(synth_sources, start=1):
+        for synth_round, source in enumerate(synth_sources, start=1):
             # find the minimum call open time on this db
             start = source.query(func.min(t_NHM_Call.c.dateOpen)).scalar()
             # and the maximum call close time on this db
             end = source.query(func.max(t_NHM_Call.c.dateClosed)).scalar()
             # then create a new Round object in the target session
-            target.add(Round(id=number, name=f'Synthesys {number}', start=start, end=end))
+            target.add(Round(id=synth_round, name=f'Synthesys {synth_round}', start=start, end=end))
+
+
+class FillCallTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Call table with data'
+
+    def _run(self, target, *synth_sources):
+        offset = 100
+        for synth_round, source in enumerate(synth_sources, start=1):
+            # TODO: is the call column ordered correctly? Should we order on date instead? Does it
+            #       even matter?
+            for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
+                # TODO: do we want to use the call.callID or start from 1?
+                call_id = (offset * synth_round) + call.callID
+                target.add(Call(id=call_id, round=synth_round, start=call.dateOpen,
+                                end=call.dateClosed))
