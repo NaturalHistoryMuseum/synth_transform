@@ -1,11 +1,14 @@
+import itertools
+
 import pycountry
 from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
+from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
-from synth.model.analysis import Round, Call, Country, Discipline
-from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline
-from synth.utils import Step, Context
+from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline
+from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline
+from synth.utils import Step, Context, SynthRound
 
 
 def get_steps(config, with_data=True):
@@ -28,6 +31,7 @@ def get_steps(config, with_data=True):
             FillCallTable(context),
             FillCountryTable(context),
             FillDisciplineTable(context),
+            FillSpecificDisciplineTable(context),
         ])
 
     return steps
@@ -145,3 +149,59 @@ class FillDisciplineTable(Step):
         # add the new Discipline objects to the target session
         for discipline in synth4.query(NHMDiscipline).order_by(NHMDiscipline.DisciplineID.asc()):
             target.add(Discipline(id=discipline.DisciplineID, name=discipline.DisciplineName))
+
+
+class FillSpecificDisciplineTable(Step):
+
+    def __init__(self, context):
+        super().__init__(context)
+        # this will keep track of the SpecificDiscipline objects we've added (keyed on their names)
+        self.added = {}
+        # an id generator so that we can reference the ids in the code before committing the changes
+        self.id_generator = itertools.count(1)
+
+    @property
+    def message(self):
+        return 'Fill SpecificDiscipline table with data'
+
+    def match_existing_specific_discipline(self, candidate):
+        """
+        Matches the given candidate specific discipline name to the given
+
+        :param candidate: the candidate NHMSpecificDiscipline object
+        :return: the SpecificDiscipline object that this candidate is a duplicate of or None
+        """
+        # TODO: fuzzy match the names/curate a mapping
+        return self.added.get(candidate.SpecificDisciplineName, None)
+
+    def _run(self, target, *synth_sources):
+        """
+        Fill the SpecificDiscipline table with data from the NHM_Specific_Discipline table.
+        Notes:
+            - We try to deduplicate the specific disciplines across the 4 synth databases by
+              matching their names up using, currently, straight up equality
+            - A translator is populated for the NHMSpecificDiscipline key during this step for use
+              by later steps
+        """
+        for synth_round, source in zip(reversed(SynthRound), reversed(synth_sources)):
+            for orig in source.query(NHMSpecificDiscipline).order_by(
+                    NHMSpecificDiscipline.SpecificDisciplineID.asc()):
+                existing = self.match_existing_specific_discipline(orig)
+
+                if existing:
+                    if orig.DisciplineID == existing.discipline_id:
+                        self.context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                                                 existing.id, synth=synth_round)
+                    else:
+                        raise SpecificDisciplineParentMismatch(
+                            synth_round, orig.SpecificDisciplineID, orig.DisciplineID,
+                            existing.discipline_id)
+                else:
+                    new_id = next(self.id_generator)
+                    new = SpecificDiscipline(id=new_id, name=orig.SpecificDisciplineName,
+                                             discipline_id=orig.DisciplineID)
+
+                    self.added[orig.SpecificDisciplineName] = new
+                    self.context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                                             new_id, synth=synth_round)
+                    target.add(new)

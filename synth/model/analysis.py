@@ -22,7 +22,7 @@ class Call(Base):
     __tablename__ = 'Call'
 
     id = Column(Integer, primary_key=True)
-    round = Column(Integer, ForeignKey('Round.id'))
+    round = Column(Integer, ForeignKey(Round.id))
     start = Column(DateTime)
     end = Column(DateTime)
 
@@ -175,9 +175,9 @@ class Projects(Base):
 class SpecificDiscipline(Base):
     __tablename__ = 'SpecificDiscipline'
 
-    # rename: id from SpecificDisciplineID
     id = Column(Integer, primary_key=True)
     name = Column(Text)
+    discipline_id = Column(Integer, ForeignKey(Discipline.id))
 
 
 class TAF(Base):
