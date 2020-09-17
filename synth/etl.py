@@ -7,7 +7,8 @@ from sqlalchemy_utils import create_database, database_exists
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline
-from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline
+from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
+    CountryIsoCode
 from synth.utils import Step, Context, SynthRound
 
 
@@ -120,17 +121,18 @@ class FillCountryTable(Step):
 
     @property
     def message(self):
-        return 'Fill Country table with data from ISO 3166-1 alpha-2'
+        return 'Fill Country table and mapping with data from ISO 3166-1 alpha-2'
 
     def _run(self, target, *args):
         """
         Fill the Country table with data from pycountry which is a library that wraps the most
-        recent ISO databases for various country and language packages.
+        recent ISO databases for various country and language packages. Also, populate a translator
+        with a map from the country codes to the new Country ids.
         """
         # add the new Country objects to the target session
-        target.add_all([
-            Country(code=country.alpha_2, name=country.name) for country in pycountry.countries
-        ])
+        for country_id, country in enumerate(pycountry.countries, start=1):
+            self.context.mapping_set(CountryIsoCode, country.alpha_2, country_id)
+            target.add(Country(id=country_id, code=country.alpha_2, name=country.name))
 
 
 class FillDisciplineTable(Step):
