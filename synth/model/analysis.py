@@ -92,25 +92,23 @@ class Institution(Base):
     TAFFamilyMember = Column(Boolean)
 
 
-class Outputs(Base):
-    __tablename__ = 'Outputs'
+class Output(Base):
+    __tablename__ = 'Output'
 
     # rename to id
     id = Column(Integer, primary_key=True)
     userID = Column(Integer)
     outputType = Column(Text)
+    publicationStatus = Column(Text)
     authors = Column(Text)
     year = Column(Integer)
     title = Column(Text)
     publisher = Column(Text)
     URL = Column(Text)
-    publicationStatusID = Column(Integer)
     volume = Column(Text)
     pages = Column(Text)
     conference = Column(Text)
     degree = Column(Text)
-    updatedDate = Column(Text)
-    publicationStatus = Column(Text)
 
 
 class Person(Base):

@@ -6,9 +6,9 @@ from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
-from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline
+from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
-    CountryIsoCode
+    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
 from synth.utils import Step, Context, SynthRound
 
 
@@ -33,6 +33,7 @@ def get_steps(config, with_data=True):
             FillCountryTable,
             FillDisciplineTable,
             FillSpecificDisciplineTable,
+            FillOutputTable,
         )])
 
     return steps
@@ -207,3 +208,54 @@ class FillSpecificDisciplineTable(Step):
                     self.context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
                                              new_id, synth=synth_round)
                     target.add(new)
+
+
+class FillOutputTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Outputs table with data'
+
+    def _run(self, target, synth1, synth2, synth3, synth4):
+        """
+        Fill the Output table with data from the NHM_Output table.
+        Notes:
+            - we denormalise the output type and publication status links
+            - years are converted to ints if they're not null
+        """
+        # extract the output types and publication statuses from the synth 4 database (all databases
+        # have the same data in these tables)
+        output_types = {
+            output_type.OutputType_ID: output_type.OutputType
+            for output_type in synth4.query(NHMOutputType)
+        }
+        publication_statuses = {
+            output_type.PublicationStatus_ID: output_type.PublicationStatus
+            for output_type in synth4.query(NHMPublicationStatu)
+        }
+
+        id_generator = itertools.count(1)
+        for synth_round, source in zip(SynthRound, (synth1, synth2, synth3, synth4)):
+            for output in source.query(NHMOutput):
+                new_id = next(id_generator)
+
+                # add a mapping from the old id to the new id
+                self.context.mapping_set(NHMOutput, output.Output_ID, new_id, synth=synth_round)
+
+                # add the Output to the target db
+                target.add(Output(
+                    id=new_id,
+                    # TODO: probably needs to be mapped
+                    # userID=
+                    outputType=output_types.get(output.OutputType_ID, None),
+                    publicationStatus=publication_statuses.get(output.PublicationStatus_ID, None),
+                    authors=output.Authors,
+                    year=int(output.Year) if output.Year is not None else None,
+                    title=output.Title,
+                    publisher=output.Publisher,
+                    URL=output.URL,
+                    volume=output.Volume,
+                    pages=output.Pages,
+                    conference=output.Conference,
+                    degree=output.Degree
+                ))
