@@ -27,13 +27,13 @@ def get_steps(config, with_data=True):
         CreateAnalysisDB(context),
     ]
     if with_data:
-        steps.extend([
-            FillRoundTable(context),
-            FillCallTable(context),
-            FillCountryTable(context),
-            FillDisciplineTable(context),
-            FillSpecificDisciplineTable(context),
-        ])
+        steps.extend([step(context) for step in (
+            FillRoundTable,
+            FillCallTable,
+            FillCountryTable,
+            FillDisciplineTable,
+            FillSpecificDisciplineTable,
+        )])
 
     return steps
 
