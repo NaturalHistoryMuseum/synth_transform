@@ -107,13 +107,13 @@ class FillCallTable(Step):
               places. The offset is calculated like so: (offset * synth_round) + NHM_Call.callID.
         """
         offset = 100
-        for synth_round, source in enumerate(synth_sources, start=1):
+        for synth_round, source in zip(SynthRound, synth_sources):
             # we order by NHM_Call.call but could easily use NHM_Call.dateOpen as they produce the
             # same order
             for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
                 # TODO: do we want to use the call.callID or start from 1?
-                call_id = (offset * synth_round) + call.callID
-                target.add(Call(id=call_id, round=synth_round, start=call.dateOpen,
+                call_id = (offset * synth_round.value) + call.callID
+                target.add(Call(id=call_id, round=synth_round.value, start=call.dateOpen,
                                 end=call.dateClosed))
 
 
