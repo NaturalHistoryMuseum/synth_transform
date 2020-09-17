@@ -1,11 +1,23 @@
 import abc
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
+from enum import Enum
 
 import click
 import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+
+class SynthRound(Enum):
+    """
+    Enum representing the 4 synth rounds.
+    """
+    ONE = 1
+    TWO = 2
+    THREE = 3
+    FOUR = 4
 
 
 class Config:
@@ -21,9 +33,6 @@ class Config:
         """
         self.sources = sources
         self.target = target
-
-        self.source_engines = [create_engine(source) for source in self.sources]
-        self.target_engine = create_engine(self.target)
 
 
 def setup(config_path):
@@ -73,8 +82,8 @@ class Step(abc.ABC):
     This class represents a step in the ETL process.
     """
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, context):
+        self.context = context
 
     @property
     @abc.abstractmethod
@@ -91,8 +100,8 @@ class Step(abc.ABC):
         """
         Runs the step.
         """
-        source_sessions = [sessionmaker(bind=engine)() for engine in self.config.source_engines]
-        target_session = sessionmaker(bind=self.config.target_engine)()
+        source_sessions = [sessionmaker(bind=engine)() for engine in self.context.source_engines]
+        target_session = sessionmaker(bind=self.context.target_engine)()
 
         with task(self.message):
             try:
@@ -118,3 +127,42 @@ class Step(abc.ABC):
         :param synth4: a Session object for the synth 4 database
         """
         pass
+
+
+class Context:
+    """
+    One object of this type should be passed around to all the steps in the run to store global
+    state.
+    """
+
+    def __init__(self, config):
+        self.config = config
+        self.source_engines = [create_engine(source) for source in self.config.sources]
+        self.target_engine = create_engine(self.config.target)
+        self.mappings = defaultdict(dict)
+
+    def mapping_set(self, source_table, original, new, synth=None):
+        """
+        Add a mapping from one value to another. The original value should come from the given
+        source_table (and the optional synth round) and map to the new value from the analysis
+        target table.
+
+        :param source_table: the table the original value comes from
+        :param original: the value from the original source table
+        :param new: the new value the original value maps to
+        :param synth: the synth round the original value comes from (optional, defaults to None)
+        """
+        self.mappings[source_table][(synth, original)] = new
+
+    def mapping_get(self, source_table, original, synth=None, default=None):
+        """
+        Retrieves the new value mapped to the provided original value in the given source_table and
+        optional synth round.
+
+        :param source_table: the table the original value comes from
+        :param original: the value from the original source table
+        :param synth: the synth round the original value comes from (optional, defaults to None)
+        :param default: the default value to return if the original value has no mapping
+        :return: the new value that the original value maps to or the default if no mapping is found
+        """
+        return self.mappings[source_table].get((synth, original), default)

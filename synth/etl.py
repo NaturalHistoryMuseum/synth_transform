@@ -5,7 +5,7 @@ from sqlalchemy_utils import create_database, database_exists
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline
-from synth.utils import Step
+from synth.utils import Step, Context
 
 
 def get_steps(config, with_data=True):
@@ -17,16 +17,17 @@ def get_steps(config, with_data=True):
     :param with_data: whether to transfer the data over too (default: True)
     :return: a list of ordered steps to perform the requested ETL
     """
+    context = Context(config)
     steps = [
-        ClearAnalysisDB(config),
-        CreateAnalysisDB(config),
+        ClearAnalysisDB(context),
+        CreateAnalysisDB(context),
     ]
     if with_data:
         steps.extend([
-            FillRoundTable(config),
-            FillCallTable(config),
-            FillCountryTable(config),
-            FillDisciplineTable(config),
+            FillRoundTable(context),
+            FillCallTable(context),
+            FillCountryTable(context),
+            FillDisciplineTable(context),
         ])
 
     return steps
@@ -42,8 +43,8 @@ class ClearAnalysisDB(Step):
         return 'Drop tables in target database (if necessary)'
 
     def _run(self, *args, **kwargs):
-        if database_exists(self.config.target):
-            engine = create_engine(self.config.target)
+        if database_exists(self.context.config.target):
+            engine = create_engine(self.context.config.target)
             analysis.Base.metadata.drop_all(engine)
 
 
@@ -57,9 +58,9 @@ class CreateAnalysisDB(Step):
         return 'Create new target database using model (if necessary)'
 
     def _run(self, *args, **kwargs):
-        if not database_exists(self.config.target):
-            create_database(self.config.target)
-        engine = create_engine(self.config.target)
+        if not database_exists(self.context.config.target):
+            create_database(self.context.config.target)
+        engine = create_engine(self.context.config.target)
         analysis.Base.metadata.create_all(engine)
 
 
