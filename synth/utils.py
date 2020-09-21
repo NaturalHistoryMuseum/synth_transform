@@ -1,4 +1,5 @@
 import abc
+import re
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
@@ -32,6 +33,20 @@ class Config:
         """
         self.sources = sources
         self.target = target
+
+
+def find_doi(string):
+    """
+    Attempts to find a DOI in the given string using a regex.
+
+    :param string: a string to search
+    :return: the DOI string or None if nothing was found
+    """
+    # regex source: https://www.crossref.org/blog/dois-and-matching-regular-expressions/
+    doi_regex = re.compile(r'10.\d{4,9}/[-._;()/:A-Z0-9]+', re.I)
+    doi_match = doi_regex.search(string)
+    if doi_match:
+        return doi_match.group()
 
 
 @contextmanager

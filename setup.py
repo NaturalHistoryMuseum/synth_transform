@@ -7,6 +7,7 @@ setup(
     install_requires=[
         'click~=7.1.2',
         'click-pathlib~=2020.3.13.0',
+        'crossrefapi~=1.5.0',
         'pycountry~=20.7.3',
         'pymysql~=0.10.0',
         'pymysql[rsa]~=0.10.0',

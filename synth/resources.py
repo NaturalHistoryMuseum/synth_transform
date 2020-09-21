@@ -3,8 +3,13 @@ import json
 from pathlib import Path
 
 import requests
+from crossref.restful import Works
 
-from synth.utils import Step
+from synth.model.rco_synthsys_live import NHMOutput
+from synth.utils import Step, find_doi
+
+INSTITUTIONS = 'institutions'
+DOIS = 'dois'
 
 
 class DataResource(abc.ABC):
@@ -19,59 +24,85 @@ class DataResource(abc.ABC):
         :param context: the context this resource is attached to
         """
         self.context = context
-        self._data = None
-
-    @property
-    def data(self):
-        """
-        Retrieves the data held in this resource, loading it if necessary.
-        :return: the data
-        """
-        if self._data is None:
-            self.load()
-        return self._data
 
     @abc.abstractmethod
-    def load(self):
+    def load(self, context, target, synth1, synth2, synth3, synth4):
         """
         Loads the resource's data.
         """
         pass
 
     @abc.abstractmethod
-    def update(self):
+    def update(self, context, target, synth1, synth2, synth3, synth4):
         """
         Updates the resource's data on disk and in memory.
         """
         pass
 
 
-class Institutions(DataResource):
+class JSONDataResource(DataResource, abc.ABC):
+
+    def __init__(self, context, path):
+        super().__init__(context)
+        self.path = path
+        self.data = {}
+
+    def load(self, *args, **kwargs):
+        if self.path.exists():
+            with open(self.path, 'r') as f:
+                self.data = json.load(f)
+
+    def update(self, *args, **kwargs):
+        # dump the data nicely
+        with open(self.path, 'w') as f:
+            json.dump(self.data, f, ensure_ascii=False, indent=2)
+
+    def get(self, key, default=None):
+        return self.data.get(key, default)
+
+
+class Institutions(JSONDataResource):
     """
     Cleaned up aliases for institution names from the Vizzuality synth 3 GitHub repo.
     """
 
     def __init__(self, context):
-        super().__init__(context)
-        self.path = DataResource.data_dir / 'master_clean.json'
+        super().__init__(context, DataResource.data_dir / 'master_clean.json')
 
-    def load(self):
-        with open(self.path, 'r') as f:
-            self._data = json.load(f)
-
-    def update(self):
-        url = 'https://raw.githubusercontent.com/Vizzuality/Synthesys3/master/Data/' \
-              'master_clean.json'
-
-        r = requests.get(url)
+    def update(self, *args, **kwargs):
+        r = requests.get('https://raw.githubusercontent.com/Vizzuality/Synthesys3/master/Data/'
+                         'master_clean.json')
         r.raise_for_status()
+        self.data = r.json()
+        # write the data dict
+        super().update()
 
-        # update the internal version of the data we have
-        self._data = r.json()
 
-        # dump it nicely
-        with open(self.path, 'w') as f:
-            json.dump(self._data, f, ensure_ascii=False, indent=2)
+class OutputDOIs(JSONDataResource):
+    """
+    This resource is a cached set of DOI metadata pulled from Crossref's API for the DOIs present in
+    the source synth databases. Having this cached speeds up the ETL processing and reduces our
+    calls to the Crossref API which is the nice thing to do.
+
+    Note that updating the cache can take about ~20 mins or so.
+    """
+
+    def __init__(self, context):
+        super().__init__(context, DataResource.data_dir / 'output_dois.json')
+        self.works = Works()
+
+    def update(self, context, target, *synth_sources):
+        self.data = {}
+        for synth_db in synth_sources:
+            for output in synth_db.query(NHMOutput).filter(NHMOutput.URL.ilike('%doi%')):
+                doi = find_doi(output.URL)
+                if doi:
+                    doi_metadata = self.works.doi(doi)
+                    if doi_metadata:
+                        self.data[doi_metadata['DOI']] = doi_metadata
+
+        # write the data dict
+        super().update()
 
 
 class RegisterResourcesStep(Step):
@@ -85,10 +116,11 @@ class RegisterResourcesStep(Step):
 
     def run(self, context, *args, **kwargs):
         resources = {
-            'institutions': Institutions(context),
+            INSTITUTIONS: Institutions(context),
+            DOIS: OutputDOIs(context),
         }
         for resource in resources.values():
-            resource.load()
+            resource.load(context, *args, **kwargs)
         context.resources.update(resources)
 
 
@@ -106,7 +138,7 @@ class UpdateResourceStep(Step):
         return f'Updating resource {self.name}'
 
     def run(self, *args, **kwargs):
-        self.resource.update()
+        self.resource.update(*args, **kwargs)
 
 
 def update_resources_tasks(context, *names):

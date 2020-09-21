@@ -6,12 +6,14 @@ import pycountry
 from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
+from crossref.restful import Works
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
-from synth.utils import Step, SynthRound
+from synth.resources import DOIS
+from synth.utils import Step, SynthRound, find_doi
 
 
 def etl_steps(with_data=True):
@@ -34,6 +36,7 @@ def etl_steps(with_data=True):
             FillDisciplineTable,
             FillSpecificDisciplineTable,
             FillOutputTable,
+            CleanOutputsTable,
         )])
 
     return steps
@@ -278,3 +281,54 @@ class FillOutputTable(Step):
                     conference=output.Conference,
                     degree=output.Degree
                 ))
+
+
+class CleanOutputsTable(Step):
+
+    def __init__(self):
+        super().__init__()
+        self.works = Works()
+
+    @property
+    def message(self):
+        return 'Clean the outputs table up'
+
+    @staticmethod
+    def update_output_from_doi(output, doi):
+        """
+        Given an Output model object and a dict of DOI metadata, update the Output object with the
+        metadata from the DOI metadata dict.
+
+        :param output: an Output model object
+        :param doi: a dict of DOI metadata from Crossref's API
+        """
+        authors = []
+        for author in doi['author']:
+            if 'given' in author and 'family' in author:
+                authors.append(f"{author['family']} {author['given']}")
+
+        output.authors = '; '.join(authors)
+        output.year = int(doi['created']['date-time'][:4])
+        output.title = doi['title'][0]
+        output.publisher = doi['publisher']
+        output.URL = doi['URL']
+        if 'volume' in doi:
+            output.volume = doi['volume']
+        if 'page' in doi:
+            output.pages = doi['page']
+
+    def run(self, context, target, *args, **kwargs):
+        """
+        Clean up the outputs table in the target database by attempting to match the entries in the
+        table to papers in Crossref's API.
+        """
+        handled = set()
+        # look for DOIs first cause they should be able to provide us with nice clean metadata
+        for output in target.query(Output).filter(Output.URL.ilike('%doi%')):
+            doi = find_doi(output.URL)
+            doi_metadata = context.resources[DOIS].get(doi, None)
+            if doi_metadata:
+                self.update_output_from_doi(output, doi_metadata)
+                handled.add(output.id)
+
+        # TODO: add more ways of matching outputs in the Crossref API
