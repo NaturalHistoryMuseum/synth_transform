@@ -1,4 +1,6 @@
 import itertools
+import re
+import subprocess
 
 import pycountry
 from sqlalchemy import create_engine, func
@@ -9,25 +11,23 @@ from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
-from synth.utils import Step, Context, SynthRound
+from synth.utils import Step, SynthRound
 
 
-def get_steps(config, with_data=True):
+def etl_steps(with_data=True):
     """
     Returns the ETL steps. If the with_data flag is passed as False then the data transform are
     omitted and the tables are simply dropped and recreated.
 
-    :param config: the Config object
     :param with_data: whether to transfer the data over too (default: True)
     :return: a list of ordered steps to perform the requested ETL
     """
-    context = Context(config)
     steps = [
-        ClearAnalysisDB(context),
-        CreateAnalysisDB(context),
+        ClearAnalysisDB(),
+        CreateAnalysisDB(),
     ]
     if with_data:
-        steps.extend([step(context) for step in (
+        steps.extend([step() for step in (
             FillRoundTable,
             FillCallTable,
             FillCountryTable,
@@ -39,6 +39,25 @@ def get_steps(config, with_data=True):
     return steps
 
 
+class GenerateSynthDatabaseModel(Step):
+    """
+    This step uses sqlacodegen to automatically create an SQLAlchemy model for the source synth
+    databases. They all use the same model so we read the synth 4 schema.
+    """
+
+    def __init__(self, filename):
+        super().__init__()
+        self.filename = filename
+
+    @property
+    def message(self):
+        return 'Generating the model for source synth databases'
+
+    def run(self, context, *args, **kwargs):
+        with open(self.filename, 'w') as f:
+            subprocess.call(['sqlacodegen', f'{context.config.sources[-1]}'], stdout=f)
+
+
 class ClearAnalysisDB(Step):
     """
     This step drops all tables from the analysis database, if there is one.
@@ -48,9 +67,9 @@ class ClearAnalysisDB(Step):
     def message(self):
         return 'Drop tables in target database (if necessary)'
 
-    def _run(self, *args, **kwargs):
-        if database_exists(self.context.config.target):
-            engine = create_engine(self.context.config.target)
+    def run(self, context, *args, **kwargs):
+        if database_exists(context.config.target):
+            engine = create_engine(context.config.target)
             analysis.Base.metadata.drop_all(engine)
 
 
@@ -63,10 +82,10 @@ class CreateAnalysisDB(Step):
     def message(self):
         return 'Create new target database using model (if necessary)'
 
-    def _run(self, *args, **kwargs):
-        if not database_exists(self.context.config.target):
-            create_database(self.context.config.target)
-        engine = create_engine(self.context.config.target)
+    def run(self, context, *args, **kwargs):
+        if not database_exists(context.config.target):
+            create_database(context.config.target)
+        engine = create_engine(context.config.target)
         analysis.Base.metadata.create_all(engine)
 
 
@@ -79,7 +98,7 @@ class FillRoundTable(Step):
     def message(self):
         return 'Fill round table with data'
 
-    def _run(self, target, *synth_sources):
+    def run(self, context, target, *synth_sources):
         """
         Fill the Round table with data from the NHM_Call tables in each of the synth sources.
         Notes:
@@ -100,7 +119,7 @@ class FillCallTable(Step):
     def message(self):
         return 'Fill Call table with data'
 
-    def _run(self, target, *synth_sources):
+    def run(self, context, target, *synth_sources):
         """
         Fill the Call table with data from the NHM_Call tables in each of the synth sources.
         Notes:
@@ -124,7 +143,7 @@ class FillCountryTable(Step):
     def message(self):
         return 'Fill Country table and mapping with data from ISO 3166-1 alpha-2'
 
-    def _run(self, target, *args):
+    def run(self, context, target, *args, **kwargs):
         """
         Fill the Country table with data from pycountry which is a library that wraps the most
         recent ISO databases for various country and language packages. Also, populate a translator
@@ -132,7 +151,7 @@ class FillCountryTable(Step):
         """
         # add the new Country objects to the target session
         for country_id, country in enumerate(pycountry.countries, start=1):
-            self.context.mapping_set(CountryIsoCode, country.alpha_2, country_id)
+            context.mapping_set(CountryIsoCode, country.alpha_2, country_id)
             target.add(Country(id=country_id, code=country.alpha_2, name=country.name))
 
 
@@ -142,7 +161,7 @@ class FillDisciplineTable(Step):
     def message(self):
         return 'Fill Discipline table with data'
 
-    def _run(self, target, synth4, *args):
+    def run(self, context, target, synth4, *args, **kwargs):
         """
         Fill the Discipline table with data from the NHM_Discipline table.
         Notes:
@@ -156,8 +175,8 @@ class FillDisciplineTable(Step):
 
 class FillSpecificDisciplineTable(Step):
 
-    def __init__(self, context):
-        super().__init__(context)
+    def __init__(self):
+        super().__init__()
         # this will keep track of the SpecificDiscipline objects we've added (keyed on their names)
         self.added = {}
         # an id generator so that we can reference the ids in the code before committing the changes
@@ -177,7 +196,7 @@ class FillSpecificDisciplineTable(Step):
         # TODO: fuzzy match the names/curate a mapping
         return self.added.get(candidate.SpecificDisciplineName, None)
 
-    def _run(self, target, *synth_sources):
+    def run(self, context, target, *synth_sources):
         """
         Fill the SpecificDiscipline table with data from the NHM_Specific_Discipline table.
         Notes:
@@ -193,7 +212,7 @@ class FillSpecificDisciplineTable(Step):
 
                 if existing:
                     if orig.DisciplineID == existing.discipline_id:
-                        self.context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                        context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
                                                  existing.id, synth=synth_round)
                     else:
                         raise SpecificDisciplineParentMismatch(
@@ -205,7 +224,7 @@ class FillSpecificDisciplineTable(Step):
                                              discipline_id=orig.DisciplineID)
 
                     self.added[orig.SpecificDisciplineName] = new
-                    self.context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                    context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
                                              new_id, synth=synth_round)
                     target.add(new)
 
@@ -216,7 +235,7 @@ class FillOutputTable(Step):
     def message(self):
         return 'Fill Outputs table with data'
 
-    def _run(self, target, synth1, synth2, synth3, synth4):
+    def run(self, context, target, synth1, synth2, synth3, synth4):
         """
         Fill the Output table with data from the NHM_Output table.
         Notes:
@@ -240,7 +259,7 @@ class FillOutputTable(Step):
                 new_id = next(id_generator)
 
                 # add a mapping from the old id to the new id
-                self.context.mapping_set(NHMOutput, output.Output_ID, new_id, synth=synth_round)
+                context.mapping_set(NHMOutput, output.Output_ID, new_id, synth=synth_round)
 
                 # add the Output to the target db
                 target.add(Output(

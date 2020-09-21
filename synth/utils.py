@@ -5,7 +5,6 @@ from datetime import datetime
 from enum import Enum
 
 import click
-import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -35,28 +34,6 @@ class Config:
         self.target = target
 
 
-def setup(config_path):
-    """
-    Create a new Config object using the YAML file at the given path.
-
-    :param config_path: the config file's path
-    :return: a Config object
-    """
-    with open(config_path, 'r') as f:
-        return Config(**yaml.safe_load(f))
-
-
-def setup_and_bind(context, config_path):
-    """
-    Sets the obj attribute on the given context with an instantiated Config object using the setup
-    function above.
-
-    :param context: the current context
-    :param config_path: the config file's path
-    """
-    context.obj = setup(config_path)
-
-
 @contextmanager
 def task(message, done='Done', time=True):
     """
@@ -82,9 +59,6 @@ class Step(abc.ABC):
     This class represents a step in the ETL process.
     """
 
-    def __init__(self, context):
-        self.context = context
-
     @property
     @abc.abstractmethod
     def message(self):
@@ -96,30 +70,12 @@ class Step(abc.ABC):
         """
         pass
 
-    def run(self):
-        """
-        Runs the step.
-        """
-        source_sessions = [sessionmaker(bind=engine)() for engine in self.context.source_engines]
-        target_session = sessionmaker(bind=self.context.target_engine)()
-
-        with task(self.message):
-            try:
-                self._run(target_session, *source_sessions)
-                target_session.commit()
-            except Exception as e:
-                target_session.rollback()
-                raise e
-            finally:
-                for source_session in source_sessions:
-                    source_session.close()
-                target_session.close()
-
     @abc.abstractmethod
-    def _run(self, target, synth1, synth2, synth3, synth4):
+    def run(self, context, target, synth1, synth2, synth3, synth4):
         """
         Abstract function to be overwritten with actual step logic.
 
+        :param context: a Context object
         :param target: a Session object for the target database
         :param synth1: a Session object for the synth 1 database
         :param synth2: a Session object for the synth 2 database
@@ -140,6 +96,7 @@ class Context:
         self.source_engines = [create_engine(source) for source in self.config.sources]
         self.target_engine = create_engine(self.config.target)
         self.mappings = defaultdict(dict)
+        self.resources = {}
 
     def mapping_set(self, source_table, original, new, synth=None):
         """
@@ -166,3 +123,28 @@ class Context:
         :return: the new value that the original value maps to or the default if no mapping is found
         """
         return self.mappings[source_table].get((synth, original), default)
+
+    def run_steps(self, steps):
+        """
+        Runs all the given steps, providing each one with the required run parameters and cleaning
+        up after each.
+
+        :param steps: the steps to run
+        """
+        for step in steps:
+            # create a new set of sessions for the source databases
+            source_sessions = [sessionmaker(bind=engine)() for engine in self.source_engines]
+            # and a new target database session
+            target_session = sessionmaker(bind=self.target_engine)()
+
+            with task(step.message):
+                try:
+                    step.run(self, target_session, *source_sessions)
+                    target_session.commit()
+                except Exception as e:
+                    target_session.rollback()
+                    raise e
+                finally:
+                    for source_session in source_sessions:
+                        source_session.close()
+                    target_session.close()
