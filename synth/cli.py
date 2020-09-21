@@ -5,7 +5,7 @@ import click_pathlib
 import yaml
 
 from synth.etl import etl_steps, GenerateSynthDatabaseModel
-from synth.resources import RegisterResourcesStep
+from synth.resources import RegisterResourcesStep, update_resources_tasks
 from synth.utils import Context, Config
 
 
@@ -78,8 +78,20 @@ def rebuild(context, with_data):
     context.run_steps(etl_steps(with_data))
 
 
+@synth.command()
+@click.option('-n', '--name', 'names', help='The name of the data to fetch', type=str,
+              multiple=True)
+@click.pass_obj
+def update(context, names):
+    """
+    Fetches all (or a subset) of the resource files used to support the synth ETL.
+    """
+    context.run_steps(update_resources_tasks(context, *names))
+
+
 if __name__ == '__main__':
     # for dev!
     # generate(obj=setup(get_here().parent / 'config.yml'))
     # rebuild(obj=setup(get_here().parent / 'config.yml'))
+    # update(obj=setup(get_here().parent / 'config.yml'))
     pass
