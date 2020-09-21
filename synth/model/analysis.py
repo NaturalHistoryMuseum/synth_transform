@@ -23,7 +23,7 @@ class Call(Base):
     __tablename__ = 'Call'
 
     id = Column(Integer, primary_key=True)
-    round = Column(Integer, ForeignKey(Round.id))
+    round_id = Column(Integer, ForeignKey(Round.id))
     start = Column(DateTime)
     end = Column(DateTime)
 
@@ -78,14 +78,14 @@ class Output(Base):
 
     # rename to id
     id = Column(Integer, primary_key=True)
-    userID = Column(Integer)
-    outputType = Column(Text)
-    publicationStatus = Column(Text)
+    user_id = Column(Integer)
+    output_type = Column(Text)
+    publication_status = Column(Text)
     authors = Column(Text)
     year = Column(Integer)
     title = Column(Text)
     publisher = Column(Text)
-    URL = Column(Text)
+    url = Column(Text)
     volume = Column(Text)
     pages = Column(Text)
     conference = Column(Text)

@@ -136,7 +136,7 @@ class FillCallTable(Step):
             for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
                 # TODO: do we want to use the call.callID or start from 1?
                 call_id = (offset * synth_round.value) + call.callID
-                target.add(Call(id=call_id, round=synth_round.value, start=call.dateOpen,
+                target.add(Call(id=call_id, round_id=synth_round.value, start=call.dateOpen,
                                 end=call.dateClosed))
 
 
@@ -216,7 +216,7 @@ class FillSpecificDisciplineTable(Step):
                 if existing:
                     if orig.DisciplineID == existing.discipline_id:
                         context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
-                                                 existing.id, synth=synth_round)
+                                            existing.id, synth=synth_round)
                     else:
                         raise SpecificDisciplineParentMismatch(
                             synth_round, orig.SpecificDisciplineID, orig.DisciplineID,
@@ -228,7 +228,7 @@ class FillSpecificDisciplineTable(Step):
 
                     self.added[orig.SpecificDisciplineName] = new
                     context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
-                                             new_id, synth=synth_round)
+                                        new_id, synth=synth_round)
                     target.add(new)
 
 
@@ -269,13 +269,13 @@ class FillOutputTable(Step):
                     id=new_id,
                     # TODO: probably needs to be mapped
                     # userID=
-                    outputType=output_types.get(output.OutputType_ID, None),
-                    publicationStatus=publication_statuses.get(output.PublicationStatus_ID, None),
+                    output_type=output_types.get(output.OutputType_ID, None),
+                    publication_status=publication_statuses.get(output.PublicationStatus_ID, None),
                     authors=output.Authors,
                     year=int(output.Year) if output.Year is not None else None,
                     title=output.Title,
                     publisher=output.Publisher,
-                    URL=output.URL,
+                    url=output.URL,
                     volume=output.Volume,
                     pages=output.Pages,
                     conference=output.Conference,
@@ -311,7 +311,7 @@ class CleanOutputsTable(Step):
         output.year = int(doi['created']['date-time'][:4])
         output.title = doi['title'][0]
         output.publisher = doi['publisher']
-        output.URL = doi['URL']
+        output.url = doi['URL']
         if 'volume' in doi:
             output.volume = doi['volume']
         if 'page' in doi:
@@ -324,8 +324,8 @@ class CleanOutputsTable(Step):
         """
         handled = set()
         # look for DOIs first cause they should be able to provide us with nice clean metadata
-        for output in target.query(Output).filter(Output.URL.ilike('%doi%')):
-            doi = find_doi(output.URL)
+        for output in target.query(Output).filter(Output.url.ilike('%doi%')):
+            doi = find_doi(output.url)
             doi_metadata = context.resources[Resource.DOIS].get(doi, None)
             if doi_metadata:
                 self.update_output_from_doi(output, doi_metadata)
