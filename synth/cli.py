@@ -5,7 +5,7 @@ import click_pathlib
 import yaml
 
 from synth.etl import etl_steps, GenerateSynthDatabaseModel
-from synth.resources import RegisterResourcesStep, update_resources_tasks
+from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
 from synth.utils import Context, Config
 
 
@@ -86,7 +86,7 @@ def update(context, names):
     """
     Fetches all (or a subset) of the resource files used to support the synth ETL.
     """
-    context.run_steps(update_resources_tasks(context, *names))
+    context.run_steps(update_resources_tasks(context, *(Resource[name.upper()] for name in names)))
 
 
 if __name__ == '__main__':

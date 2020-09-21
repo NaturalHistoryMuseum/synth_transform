@@ -1,5 +1,6 @@
 import abc
 import json
+import enum
 from pathlib import Path
 
 import requests
@@ -8,8 +9,11 @@ from crossref.restful import Works
 from synth.model.rco_synthsys_live import NHMOutput
 from synth.utils import Step, find_doi
 
-INSTITUTIONS = 'institutions'
-DOIS = 'dois'
+
+@enum.unique
+class Resource(enum.Enum):
+    INSTITUTIONS = 'institutions'
+    DOIS = 'dois'
 
 
 class DataResource(abc.ABC):
@@ -116,8 +120,8 @@ class RegisterResourcesStep(Step):
 
     def run(self, context, *args, **kwargs):
         resources = {
-            INSTITUTIONS: Institutions(context),
-            DOIS: OutputDOIs(context),
+            Resource.INSTITUTIONS: Institutions(context),
+            Resource.DOIS: OutputDOIs(context),
         }
         for resource in resources.values():
             resource.load(context, *args, **kwargs)

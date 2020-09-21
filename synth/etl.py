@@ -12,7 +12,7 @@ from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
-from synth.resources import DOIS
+from synth.resources import Resource
 from synth.utils import Step, SynthRound, find_doi
 
 
@@ -326,7 +326,7 @@ class CleanOutputsTable(Step):
         # look for DOIs first cause they should be able to provide us with nice clean metadata
         for output in target.query(Output).filter(Output.URL.ilike('%doi%')):
             doi = find_doi(output.URL)
-            doi_metadata = context.resources[DOIS].get(doi, None)
+            doi_metadata = context.resources[Resource.DOIS].get(doi, None)
             if doi_metadata:
                 self.update_output_from_doi(output, doi_metadata)
                 handled.add(output.id)
