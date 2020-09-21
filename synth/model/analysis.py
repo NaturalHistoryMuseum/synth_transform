@@ -1,5 +1,6 @@
 # coding: utf-8
-from sqlalchemy import Column, DECIMAL, DateTime, Integer, Text, Boolean, String, ForeignKey
+from sqlalchemy import Column, DateTime, Integer, Text, Boolean, String, ForeignKey, \
+    BigInteger
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -40,26 +41,6 @@ class Discipline(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(Text)
-
-
-class Evaluation(Base):
-    __tablename__ = 'Evaluation'
-
-    # reorder: brought the pk to the top, this column is PK_App_Score_ID btw
-    id = Column(Integer, primary_key=True)
-    # TODO: fk
-    userProjectID = Column(Integer)
-    # TODO: fk
-    TAFScorerID = Column(Integer)
-    methodologyScore = Column(DECIMAL(10, 2))
-    researchExcellenceScore = Column(DECIMAL(10, 2))
-    supportStatementScore = Column(DECIMAL(10, 2))
-    justificationScore = Column(DECIMAL(10, 2))
-    expectedGainsScore = Column(DECIMAL(10, 2))
-    scientificMeritScore = Column(DECIMAL(10, 2))
-    USPComment = Column(Text)
-    scoredFlag = Column(Integer)
-    societalChallengeScore = Column(DECIMAL(10, 2))
 
 
 class Facility(Base):
@@ -111,65 +92,6 @@ class Output(Base):
     degree = Column(Text)
 
 
-class Person(Base):
-    __tablename__ = 'Person'
-
-    # rename: id from User_ID
-    id = Column(Integer, primary_key=True)
-    role = Column(Text)
-    gender = Column(Text)
-    nationalityCountryCode = Column(Text)
-    researcherStatus = Column(Text)
-    discipline1 = Column(Integer)
-    discipline2 = Column(Integer)
-    discipline3 = Column(Integer)
-    homeInstitutionType = Column(Text)
-    homeInstitutionDept = Column(Text)
-    homeInstitutionName = Column(Text)
-    homeInstitutionTown = Column(Text)
-    homeInstitutionCountryCode = Column(Text)
-    homeInstitutionPostcode = Column(Text)
-    numberOfVisits = Column(Integer)
-    durationOfStays = Column(Integer)
-    nationalityOtherText = Column(Text)
-
-
-class ProjectOutputLink(Base):
-    __tablename__ = 'ProjectOutputLink'
-
-    # rename: id from LinkID
-    id = Column(Integer, primary_key=True)
-    projectID = Column(Integer)
-    outputID = Column(Integer)
-
-
-class Projects(Base):
-    __tablename__ = 'Projects'
-
-    # rename: id from UserProject_ID
-    id = Column(Integer, primary_key=True)
-    TAFID = Column(Integer)
-    userID = Column(Integer)
-    userProjectTitle = Column(Text)
-    userProjectObjectives = Column(Text)
-    userProjectAchievements = Column(Text)
-    lengthOfVisit = Column(Integer)
-    startDate = Column(DateTime)
-    finishDate = Column(DateTime)
-    homeFacilities = Column(Boolean)
-    applicationState = Column(Text)
-    acceptance = Column(Boolean)
-    userProjectSummary = Column(Text)
-    newUser = Column(Boolean)
-    userProjectFacilityReasons = Column(Text)
-    submissionDate = Column(DateTime)
-    supportFinal = Column(Boolean)
-    projectDiscipline = Column(Integer)
-    projectSpecificDiscipline = Column(Integer)
-    callSubmitted = Column(Text)
-    previousApplication = Column(Boolean)
-
-
 class SpecificDiscipline(Base):
     __tablename__ = 'SpecificDiscipline'
 
@@ -185,3 +107,69 @@ class TAF(Base):
     id = Column(Integer, primary_key=True)
     infrastructureShortName = Column(Text)
     name = Column(Text)
+
+
+class VisitorProject(Base):
+    __tablename__ = 'VisitorProject'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Text)
+    objectives = Column(Text)
+    achievements = Column(Text)
+    user_guid = Column(BigInteger)
+    length_of_visit = Column(Integer)
+    start_date = Column(DateTime)
+    finish_date = Column(Text)
+    # TODO: fk
+    taf_id = Column(Integer)
+    home_facilities = Column(Boolean)
+    # TODO: enum?
+    application_state = Column(Text)
+    acceptance = Column(Boolean)
+    summary = Column(Text)
+    new_user = Column(Boolean)
+    facility_reasons = Column(Text)
+    submission_date = Column(DateTime)
+    support_final = Column(Boolean)
+    # TODO: fk?
+    project_discipline = Column(Integer)
+    # TODO: fk?
+    project_specific_discipline = Column(Integer)
+    # TODO: datetime?
+    call_submitted = Column(Text)
+    previous_application = Column(Boolean)
+    training_requirement = Column(Text)
+    # TODO: fk?
+    supporter_institution = Column(Text)
+    # TODO: enum?
+    administration_state = Column(Text)
+    group_leader = Column(Boolean)
+    group_members = Column(Text)
+    background = Column(Text)
+    reasons = Column(Text)
+    expectations = Column(Text)
+    outputs = Column(Text)
+    # TODO: fk?
+    group_leader_institution = Column(Text)
+    visit_funded_previously = Column(Boolean)
+    # TODO: enum?
+    gender = Column(Text)
+    nationality = Column(Integer, ForeignKey(Country.id))
+    researcher_status = Column(Text)
+    # TODO: fk for all 3 of these
+    researcher_discipline1 = Column(Text)
+    researcher_discipline2 = Column(Text)
+    researcher_discipline3 = Column(Text)
+    home_institution_type = Column(Text)
+    home_institution_dept = Column(Text)
+    home_institution_name = Column(Text)
+    home_institution_town = Column(Text)
+    home_institution_country = Column(Integer, ForeignKey(Country.id))
+    home_institution_postcode = Column(Text)
+    number_of_visits = Column(Integer)
+    duration_of_stays = Column(Integer)
+    nationality_other = Column(Text)
+    remote_user = Column(Text)
+    # TODO: boolean?
+    travel_and_subsistence_reimbursed = Column(Text)
+    job_title = Column(Text)
