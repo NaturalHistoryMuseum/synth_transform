@@ -1,4 +1,5 @@
 import abc
+import csv
 import json
 import enum
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 import requests
 from crossref.restful import Works
 
+from synth.errors import DuplicateUserGUIDError
 from synth.model.rco_synthsys_live import NHMOutput
 from synth.utils import Step, find_doi
 
@@ -14,6 +16,7 @@ from synth.utils import Step, find_doi
 class Resource(enum.Enum):
     INSTITUTIONS = 'institutions'
     DOIS = 'dois'
+    USERS = 'users'
 
 
 class DataResource(abc.ABC):
@@ -109,6 +112,49 @@ class OutputDOIs(JSONDataResource):
         super().update()
 
 
+class Users(DataResource):
+    """
+    This resource represents a map between the unique identifiers in each of the synth databased for
+    a given user and a new unique identifer (the GUID) for that user. This allows us to track the
+    users across the databases. This data is compiled offline because of risks with PII. This is
+    also why it includes age data in the form of the user's age range at the time of each of the
+    synth rounds.
+    """
+
+    @enum.unique
+    class Columns(enum.Enum):
+        # cheeky enum to define the columns in the csv
+        GUID = 'GUID'
+        SYNTH_1_ID = 'synth1_ID'
+        SYNTH_2_ID = "synth2_ID"
+        SYNTH_3_ID = "synth3_ID"
+        SYNTH_4_ID = 'synth4_ID'
+        SYNTH_1_AGE = "Synth round 1 age"
+        SYNTH_2_AGE = "Synth round 2 age"
+        SYNTH_3_AGE = "Synth round 3 age"
+        SYNTH_4_AGE = "Synth round 4 age"
+
+    def __init__(self, context):
+        super().__init__(context)
+        self.path = DataResource.data_dir / 'users.csv'
+        self.data = {}
+
+    def load(self, *args, **kwargs):
+        with open(self.path, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                guid = row.pop(Users.Columns.GUID.value)
+                if guid in self.data:
+                    raise DuplicateUserGUIDError(guid)
+                else:
+                    self.data[guid] = row
+
+    def update(self, *args, **kwargs):
+        # sadly creating the csv is an offline process to avoid exposing PII in both this code and
+        # the databases, therefore it can't be updated here
+        pass
+
+
 class RegisterResourcesStep(Step):
     """
     This step registers and loads all the resources we know about into the context.
@@ -122,6 +168,7 @@ class RegisterResourcesStep(Step):
         resources = {
             Resource.INSTITUTIONS: Institutions(context),
             Resource.DOIS: OutputDOIs(context),
+            Resource.USERS: Users(context),
         }
         for resource in resources.values():
             resource.load(context, *args, **kwargs)

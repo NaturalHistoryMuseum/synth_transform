@@ -17,3 +17,13 @@ class SpecificDisciplineParentMismatch(Exception):
         self.specific_discipline_id = specific_discipline_id
         self.new_displine_id = new_displine_id
         self.added_discipline_id = added_discipline_id
+
+
+class DuplicateUserGUIDError(Exception):
+    """
+    This exception is raised when the user csv resource is read and it contains a duplicate GUID.
+    """
+
+    def __init__(self, duplicate_guid):
+        super().__init__(f'A duplicate GUID was found when loading the users csv: {duplicate_guid}')
+        self.duplicate_guid = duplicate_guid
