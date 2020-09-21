@@ -1,16 +1,17 @@
 import abc
+import enum
 import re
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
-from enum import Enum
 
 import click
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-class SynthRound(Enum):
+@enum.unique
+class SynthRound(enum.IntEnum):
     """
     Enum representing the 4 synth rounds.
     """
