@@ -103,10 +103,28 @@ To do this it drops and recreates all the tables in the analytics database and t
 steps to copy the data over, transforming it as it goes.
 
 
+### `update`
+```bash
+synth update
+synth update --name <name>
+synth update --name <name> --name <name> ...
+```
+
+Updates the supplementary data (if possible).
+It is possible to specify which resources to update using the `--name` option which can be specified multiple times to only update a set of names.
+
+At present this command can take 20+ mins to run due to the [DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json) which is pulled from the Crossref API.
+
+The names of the resources are listed below in the _"Supplementary Data"_ section.
+
+
 ## Supplementary Data
 In the `data` directory there are some supplementary files which are listed below along with their
 source.
 
-| file | source |
-| ---- | ------ |
-| `master_clean.json` | This file comes from [https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json](https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json) and provides a mapping between some dirty Synthesys place data and clean versions of places. |
+| file | name | source | updatable? |
+| ---- | ---- | ------ | ---------- |
+| `master_clean.json` | `institutions` | This file comes from [https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json](https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json) and provides a mapping between some dirty Synthesys place data and clean versions of places. | Yes, though only by pulling the latest version from GitHub which is unlikely to be updated at this point |
+| `output_dois.json` | `dois` | This file is generated using the Crossref API. We iterate over all of the DOIs we can find in the `NHM_Output` tables in the source synth databases, retrieve the DOI metadata from Crossref and then store it in this cache file. Updating this file can take 20+ mins. | Yes |
+| `users.csv` | `users` | A CSV of PII safe user data which we can use to match users across the source synth databases. | No, only manually updatable |
+
