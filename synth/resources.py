@@ -186,7 +186,7 @@ class UpdateResourceStep(Step):
 
     @property
     def message(self):
-        return f'Updating resource {self.name}'
+        return f'Updating resource {self.name.value}'
 
     def run(self, *args, **kwargs):
         self.resource.update(*args, **kwargs)
