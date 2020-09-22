@@ -115,7 +115,7 @@ It is possible to specify which resources to update using the `--name` option wh
 
 At present this command can take 20+ mins to run due to the [DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json) which is pulled from the Crossref API.
 
-The names of the resources are listed below in the [_"Supplementary Data"_](#supplementary-data) section.
+The names of the resources are listed below in the [_Supplementary Data_](#supplementary-data) section.
 
 
 ## Supplementary Data
