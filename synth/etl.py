@@ -5,7 +5,6 @@ import pycountry
 from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
-from crossref.restful import Works
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
@@ -288,7 +287,6 @@ class CleanOutputsTable(Step):
 
     def __init__(self):
         super().__init__()
-        self.works = Works()
 
     @property
     def message(self):
