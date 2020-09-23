@@ -9,7 +9,7 @@ from crossref.restful import Works
 
 from synth.errors import DuplicateUserGUIDError
 from synth.model.rco_synthsys_live import NHMOutput
-from synth.utils import Step, find_doi
+from synth.utils import Step, find_doi, SynthRound
 
 
 @enum.unique
@@ -125,14 +125,14 @@ class Users(DataResource):
     class Columns(enum.Enum):
         # cheeky enum to define the columns in the csv
         GUID = 'GUID'
-        SYNTH_1_ID = 'synth1_ID'
-        SYNTH_2_ID = "synth2_ID"
-        SYNTH_3_ID = "synth3_ID"
-        SYNTH_4_ID = 'synth4_ID'
-        SYNTH_1_AGE = "Synth round 1 age"
-        SYNTH_2_AGE = "Synth round 2 age"
-        SYNTH_3_AGE = "Synth round 3 age"
-        SYNTH_4_AGE = "Synth round 4 age"
+        SYNTH_1_ID = 'synth1'
+        SYNTH_2_ID = "synth2"
+        SYNTH_3_ID = "synth3"
+        SYNTH_4_ID = 'synth4'
+        SYNTH_1_AGE = "synth round 1 age"
+        SYNTH_2_AGE = "synth round 2 age"
+        SYNTH_3_AGE = "synth round 3 age"
+        SYNTH_4_AGE = "synth round 4 age"
 
         @staticmethod
         def id_column(synth_round):
@@ -165,11 +165,26 @@ class Users(DataResource):
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                guid = row.pop(Users.Columns.GUID.value)
+                guid = row[Users.Columns.GUID.value]
                 if guid in self.data:
                     raise DuplicateUserGUIDError(guid)
                 else:
-                    self.data[guid] = row
+                    user = {}
+                    for synth_round in SynthRound:
+                        # first deal with the id from the synth round
+                        id_column = Users.Columns.id_column(synth_round)
+                        id_value = row[id_column.value]
+                        if id_value:
+                            user[id_column] = set(map(int, row[id_column.value].split(',')))
+                        else:
+                            user[id_column] = set()
+
+                        # then deal with the age for the synth round
+                        age_column = Users.Columns.age_column(synth_round)
+                        age_value = row[age_column.value]
+                        user[age_column] = age_value if age_value else None
+
+                    self.data[guid] = user
 
     def update(self, *args, **kwargs):
         # sadly creating the csv is an offline process to avoid exposing PII in both this code and
@@ -187,7 +202,7 @@ class Users(DataResource):
         user_id = int(user_id)
         column = Users.Columns.id_column(synth_round)
         for guid, row in self.data.items():
-            if row[column.value] and int(row[column.value]) == user_id:
+            if user_id in row[column]:
                 return guid
 
     def lookup_age(self, synth_round, user_guid):
@@ -198,7 +213,7 @@ class Users(DataResource):
         :param user_guid: the user's guid
         :return: the user's age during the round
         """
-        return self.data[user_guid][Users.Columns.age_column(synth_round).value]
+        return self.data[user_guid][Users.Columns.age_column(synth_round)]
 
 
 class RegisterResourcesStep(Step):
