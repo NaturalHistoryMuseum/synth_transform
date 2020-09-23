@@ -365,8 +365,9 @@ class FillVisitorProjectTable(Step):
             for project in projects:
                 user_guid = users.lookup_guid(synth_round, project.User_ID)
                 if user_guid is None:
-                    # print(f'missing guid for user {project.User_ID} on project '
-                    #       f'{project.UserProject_ID} in synth {synth_round.value}')
+                    # this is assumed to be fine and simply implies that the user's project or the
+                    # user was eliminated by the process that creates the users.csv file. We can
+                    # safely ignore this project and just move on
                     continue
 
                 user = source.query(TListOfUser).get(project.User_ID)
