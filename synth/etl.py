@@ -11,7 +11,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
     VisitorProject
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
-from synth.resources import Resource
+from synth.resources import Resource, RegisterResourcesStep
 from synth.utils import Step, SynthRound, find_doi
 
 
@@ -28,7 +28,9 @@ def etl_steps(with_data=True):
         CreateAnalysisDB(),
     ]
     if with_data:
+        # add all the other steps
         steps.extend([step() for step in (
+            RegisterResourcesStep,
             FillRoundTable,
             FillCallTable,
             FillCountryTable,

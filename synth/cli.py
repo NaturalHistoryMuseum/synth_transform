@@ -28,11 +28,7 @@ def setup(config_path):
     with open(config_path, 'r') as f:
         config = Config(**yaml.safe_load(f))
 
-    context = Context(config)
-    context.run_steps([
-        RegisterResourcesStep(),
-    ])
-    return context
+    return Context(config)
 
 
 def setup_and_bind(context, config_path):
@@ -86,6 +82,11 @@ def update(context, names):
     """
     Fetches all (or a subset) of the resource files used to support the synth ETL.
     """
+    # first register the resources
+    context.run_steps([RegisterResourcesStep()])
+    # then update them all, note that these have to be run after the context has had the resources
+    # registered and therefore we can't (sadly!) just call run_steps once because the steps in the
+    # below line are generated from the effects of the above line
     context.run_steps(update_resources_tasks(context, *(Resource[name.upper()] for name in names)))
 
 
