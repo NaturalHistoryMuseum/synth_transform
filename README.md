@@ -1,5 +1,7 @@
 # Synth Transform
 
+![python versions](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)
+
 _This project is under active development!_
 
 
@@ -9,6 +11,8 @@ _This project is under active development!_
 ## Installation
 
 ### Virtualenv
+Python 3.8 is recommended though currently the code should work in Python 3.6+.
+
 It is recommended to use [virtualenv]() with this project to keep everything tidy:
 
 ```bash
