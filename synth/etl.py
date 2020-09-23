@@ -211,7 +211,8 @@ class FillSpecificDisciplineTable(Step):
                     NHMSpecificDiscipline.SpecificDisciplineID.asc()):
                 existing = self.match_existing_specific_discipline(orig)
 
-                mapped_discipline_id = context.translate(NHMDiscipline, orig.DisciplineID)
+                mapped_discipline_id = context.translate(NHMDiscipline, orig.DisciplineID,
+                                                         synth_round)
 
                 if existing:
                     if mapped_discipline_id == existing.discipline_id:
@@ -369,7 +370,7 @@ class FillVisitorProjectTable(Step):
                 user = source.query(TListOfUser).get(project.User_ID)
                 try:
                     call_submitted = context.translate(t_NHM_Call, int(project.Call_Submitted),
-                                                       synth_round=synth_round)
+                                                       synth_round)
                 except ValueError:
                     call_submitted = None
 
@@ -399,8 +400,7 @@ class FillVisitorProjectTable(Step):
                     # note that all projects have the same ids for this table so this is fine
                     project_discipline=project.Project_Discipline,
                     project_specific_discipline=context.translate(
-                        NHMSpecificDiscipline, project.Project_Specific_Discipline,
-                        synth_round=synth_round),
+                        NHMSpecificDiscipline, project.Project_Specific_Discipline, synth_round),
                     call_submitted=call_submitted,
                     # TODO: check for nulls
                     previous_application=bool(project.Previous_Application),
@@ -422,7 +422,8 @@ class FillVisitorProjectTable(Step):
                     ############ user based info ############
                     # TODO: standardise to an enum?
                     gender=user.Gender,
-                    nationality=context.translate(CountryIsoCode, user.Nationality_Country_code),
+                    nationality=context.translate(CountryIsoCode, user.Nationality_Country_code,
+                                                  synth_round),
                     researcher_status=user.Researcher_status,
                     researcher_discipline1=user.Discipline1,
                     researcher_discipline2=user.Discipline2,
@@ -433,7 +434,7 @@ class FillVisitorProjectTable(Step):
                     home_institution_town=user.Home_Institution_Town,
                     home_institution_country=context.translate(CountryIsoCode,
                                                                user.Home_Institution_Country_code,
-                                                               synth_round=synth_round),
+                                                               synth_round),
                     home_institution_postcode=user.Home_Institution_Postcode,
                     number_of_visits=user.Number_of_visits,
                     duration_of_stays=user.Duration_of_stays,

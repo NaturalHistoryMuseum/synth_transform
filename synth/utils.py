@@ -131,14 +131,14 @@ class Context:
         for sr in rounds:
             self.mappings[source_table][(sr, original)] = new
 
-    def translate(self, source_table, original, synth_round=None, default=None):
+    def translate(self, source_table, original, synth_round, default=None):
         """
         Retrieves the new value mapped to the provided original value in the given source_table and
-        optional synth round.
+        synth round.
 
         :param source_table: the table the original value comes from
         :param original: the value from the original source table
-        :param synth_round: the synth round the original value is from (optional, defaults to None)
+        :param synth_round: the synth round the original value is from
         :param default: the default value to return if the original value has no mapping
         :return: the new value that the original value maps to or the default if no mapping is found
         """
