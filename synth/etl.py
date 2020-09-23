@@ -375,6 +375,7 @@ class FillVisitorProjectTable(Step):
                     call_submitted = context.translate(t_NHM_Call, int(project.Call_Submitted),
                                                        synth_round)
                 except ValueError:
+                    # the original project.Call_Submitted data wasn't an int, just null it
                     call_submitted = None
 
                 visitor_project = VisitorProject(
