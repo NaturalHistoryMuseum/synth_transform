@@ -1,5 +1,5 @@
 .idea
 venv
-config.yml
+*config.yml
 synth.egg-info
 __pycache__
