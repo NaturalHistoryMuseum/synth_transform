@@ -1,5 +1,4 @@
 import itertools
-import re
 import subprocess
 
 import pycountry
@@ -14,6 +13,11 @@ from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecific
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
 from synth.resources import Resource
 from synth.utils import Step, SynthRound, find_doi
+
+
+# TODO: we should put all ids in the context mapping tables to avoid having to check if all the
+#       synth sources are the same, then everything follows the same pattern even if it doesn't
+#       technically need the mapping (example, NHMDiscipline)
 
 
 def etl_steps(with_data=True):
@@ -125,17 +129,14 @@ class FillCallTable(Step):
     def run(self, context, target, *synth_sources):
         """
         Fill the Call table with data from the NHM_Call tables in each of the synth sources.
-        Notes:
-            - the Call ids are generated using an offset to make it easier to map them in other
-              places. The offset is calculated like so: (offset * synth_round) + NHM_Call.callID.
         """
-        offset = 100
+        id_generator = itertools.count(1)
         for synth_round, source in zip(SynthRound, synth_sources):
             # we order by NHM_Call.call but could easily use NHM_Call.dateOpen as they produce the
             # same order
             for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
-                # TODO: do we want to use the call.callID or start from 1?
-                call_id = (offset * synth_round.value) + call.callID
+                call_id = next(id_generator)
+                context.mapping_set(t_NHM_Call, call.callID, call_id, synth=synth_round)
                 target.add(Call(id=call_id, round_id=synth_round.value, start=call.dateOpen,
                                 end=call.dateClosed))
 
