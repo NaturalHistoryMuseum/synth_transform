@@ -15,11 +15,6 @@ from synth.resources import Resource
 from synth.utils import Step, SynthRound, find_doi
 
 
-# TODO: we should put all ids in the context mapping tables to avoid having to check if all the
-#       synth sources are the same, then everything follows the same pattern even if it doesn't
-#       technically need the mapping (example, NHMDiscipline)
-
-
 def etl_steps(with_data=True):
     """
     Returns the ETL steps. If the with_data flag is passed as False then the data transform are
@@ -175,6 +170,7 @@ class FillDisciplineTable(Step):
         """
         # add the new Discipline objects to the target session
         for discipline in synth4.query(NHMDiscipline).order_by(NHMDiscipline.DisciplineID.asc()):
+            context.mapping_set(NHMDiscipline, discipline.DisciplineID, discipline.DisciplineID)
             target.add(Discipline(id=discipline.DisciplineID, name=discipline.DisciplineName))
 
 
@@ -215,8 +211,10 @@ class FillSpecificDisciplineTable(Step):
                     NHMSpecificDiscipline.SpecificDisciplineID.asc()):
                 existing = self.match_existing_specific_discipline(orig)
 
+                mapped_discipline_id = context.mapping_get(NHMDiscipline, orig.DisciplineID)
+
                 if existing:
-                    if orig.DisciplineID == existing.discipline_id:
+                    if mapped_discipline_id == existing.discipline_id:
                         context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
                                             existing.id, synth=synth_round)
                     else:
@@ -226,7 +224,7 @@ class FillSpecificDisciplineTable(Step):
                 else:
                     new_id = next(self.id_generator)
                     new = SpecificDiscipline(id=new_id, name=orig.SpecificDisciplineName,
-                                             discipline_id=orig.DisciplineID)
+                                             discipline_id=mapped_discipline_id)
 
                     self.added[orig.SpecificDisciplineName] = new
                     context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
