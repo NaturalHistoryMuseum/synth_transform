@@ -132,7 +132,7 @@ class FillCallTable(Step):
             # same order
             for call in source.query(t_NHM_Call).order_by(t_NHM_Call.c.call.asc()):
                 call_id = next(id_generator)
-                context.mapping_set(t_NHM_Call, call.callID, call_id, synth=synth_round)
+                context.map(t_NHM_Call, call.callID, call_id, synth_round=synth_round)
                 target.add(Call(id=call_id, round_id=synth_round.value, start=call.dateOpen,
                                 end=call.dateClosed))
 
@@ -151,7 +151,7 @@ class FillCountryTable(Step):
         """
         # add the new Country objects to the target session
         for country_id, country in enumerate(pycountry.countries, start=1):
-            context.mapping_set(CountryIsoCode, country.alpha_2, country_id)
+            context.map(CountryIsoCode, country.alpha_2, country_id)
             target.add(Country(id=country_id, code=country.alpha_2, name=country.name))
 
 
@@ -170,7 +170,7 @@ class FillDisciplineTable(Step):
         """
         # add the new Discipline objects to the target session
         for discipline in synth4.query(NHMDiscipline).order_by(NHMDiscipline.DisciplineID.asc()):
-            context.mapping_set(NHMDiscipline, discipline.DisciplineID, discipline.DisciplineID)
+            context.map(NHMDiscipline, discipline.DisciplineID, discipline.DisciplineID)
             target.add(Discipline(id=discipline.DisciplineID, name=discipline.DisciplineName))
 
 
@@ -211,12 +211,14 @@ class FillSpecificDisciplineTable(Step):
                     NHMSpecificDiscipline.SpecificDisciplineID.asc()):
                 existing = self.match_existing_specific_discipline(orig)
 
-                mapped_discipline_id = context.mapping_get(NHMDiscipline, orig.DisciplineID)
+                mapped_discipline_id = context.translate(NHMDiscipline, orig.DisciplineID)
 
                 if existing:
                     if mapped_discipline_id == existing.discipline_id:
-                        context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
-                                            existing.id, synth=synth_round)
+                        # also map this specific discipline id to another existing id that we've
+                        # already added
+                        context.map(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                                    existing.id, synth_round=synth_round)
                     else:
                         raise SpecificDisciplineParentMismatch(
                             synth_round, orig.SpecificDisciplineID, orig.DisciplineID,
@@ -227,8 +229,8 @@ class FillSpecificDisciplineTable(Step):
                                              discipline_id=mapped_discipline_id)
 
                     self.added[orig.SpecificDisciplineName] = new
-                    context.mapping_set(NHMSpecificDiscipline, orig.SpecificDisciplineID,
-                                        new_id, synth=synth_round)
+                    context.map(NHMSpecificDiscipline, orig.SpecificDisciplineID,
+                                new_id, synth_round=synth_round)
                     target.add(new)
 
 
@@ -262,7 +264,7 @@ class FillOutputTable(Step):
                 new_id = next(id_generator)
 
                 # add a mapping from the old id to the new id
-                context.mapping_set(NHMOutput, output.Output_ID, new_id, synth=synth_round)
+                context.map(NHMOutput, output.Output_ID, new_id, synth_round=synth_round)
 
                 # add the Output to the target db
                 target.add(Output(
@@ -366,8 +368,8 @@ class FillVisitorProjectTable(Step):
 
                 user = source.query(TListOfUser).get(project.User_ID)
                 try:
-                    call_submitted = context.mapping_get(t_NHM_Call, int(project.Call_Submitted),
-                                                         synth=synth_round)
+                    call_submitted = context.translate(t_NHM_Call, int(project.Call_Submitted),
+                                                       synth_round=synth_round)
                 except ValueError:
                     call_submitted = None
 
@@ -396,9 +398,9 @@ class FillVisitorProjectTable(Step):
                     support_final=bool(project.Support_Final),
                     # note that all projects have the same ids for this table so this is fine
                     project_discipline=project.Project_Discipline,
-                    project_specific_discipline=context.mapping_get(
+                    project_specific_discipline=context.translate(
                         NHMSpecificDiscipline, project.Project_Specific_Discipline,
-                        synth=synth_round),
+                        synth_round=synth_round),
                     call_submitted=call_submitted,
                     # TODO: check for nulls
                     previous_application=bool(project.Previous_Application),
@@ -420,7 +422,7 @@ class FillVisitorProjectTable(Step):
                     ############ user based info ############
                     # TODO: standardise to an enum?
                     gender=user.Gender,
-                    nationality=context.mapping_get(CountryIsoCode, user.Nationality_Country_code),
+                    nationality=context.translate(CountryIsoCode, user.Nationality_Country_code),
                     researcher_status=user.Researcher_status,
                     researcher_discipline1=user.Discipline1,
                     researcher_discipline2=user.Discipline2,
@@ -429,8 +431,9 @@ class FillVisitorProjectTable(Step):
                     home_institution_dept=user.Home_Institution_Dept,
                     home_institution_name=user.Home_Institution_Name,
                     home_institution_town=user.Home_Institution_Town,
-                    home_institution_country=context.mapping_get(
-                        CountryIsoCode, user.Home_Institution_Country_code),
+                    home_institution_country=context.translate(CountryIsoCode,
+                                                               user.Home_Institution_Country_code,
+                                                               synth_round=synth_round),
                     home_institution_postcode=user.Home_Institution_Postcode,
                     number_of_visits=user.Number_of_visits,
                     duration_of_stays=user.Duration_of_stays,

@@ -114,31 +114,35 @@ class Context:
         self.mappings = defaultdict(dict)
         self.resources = {}
 
-    def mapping_set(self, source_table, original, new, synth=None):
+    def map(self, source_table, original, new, synth_round=None):
         """
         Add a mapping from one value to another. The original value should come from the given
         source_table (and the optional synth round) and map to the new value from the analysis
         target table.
 
+        If the synth_round parameter is None then the mapping will be made for all synth rounds.
+
         :param source_table: the table the original value comes from
         :param original: the value from the original source table
         :param new: the new value the original value maps to
-        :param synth: the synth round the original value comes from (optional, defaults to None)
+        :param synth_round: the synth round the original value is from (optional, defaults to None)
         """
-        self.mappings[source_table][(synth, original)] = new
+        rounds = list(SynthRound) if synth_round is None else [synth_round]
+        for sr in rounds:
+            self.mappings[source_table][(sr, original)] = new
 
-    def mapping_get(self, source_table, original, synth=None, default=None):
+    def translate(self, source_table, original, synth_round=None, default=None):
         """
         Retrieves the new value mapped to the provided original value in the given source_table and
         optional synth round.
 
         :param source_table: the table the original value comes from
         :param original: the value from the original source table
-        :param synth: the synth round the original value comes from (optional, defaults to None)
+        :param synth_round: the synth round the original value is from (optional, defaults to None)
         :param default: the default value to return if the original value has no mapping
         :return: the new value that the original value maps to or the default if no mapping is found
         """
-        return self.mappings[source_table].get((synth, original), default)
+        return self.mappings[source_table].get((synth_round, original), default)
 
     def run_steps(self, steps):
         """
