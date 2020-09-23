@@ -1,7 +1,7 @@
 import abc
 import csv
-import json
 import enum
+import json
 from pathlib import Path
 
 import requests
@@ -134,6 +134,28 @@ class Users(DataResource):
         SYNTH_3_AGE = "Synth round 3 age"
         SYNTH_4_AGE = "Synth round 4 age"
 
+        @staticmethod
+        def id_column(synth_round):
+            """
+            Given a synth round, returns the appropriate Columns enum for the user's ID in that
+            round.
+
+            :param synth_round: the synth round
+            :return: a Columns enum
+            """
+            return Users.Columns[f'SYNTH_{synth_round.value}_ID']
+
+        @staticmethod
+        def age_column(synth_round):
+            """
+            Given a synth round, returns the appropriate Columns enum for the user's age in that
+            round.
+
+            :param synth_round: the synth round
+            :return: a Columns enum
+            """
+            return Users.Columns[f'SYNTH_{synth_round.value}_AGE']
+
     def __init__(self, context):
         super().__init__(context)
         self.path = DataResource.data_dir / 'users.csv'
@@ -153,6 +175,30 @@ class Users(DataResource):
         # sadly creating the csv is an offline process to avoid exposing PII in both this code and
         # the databases, therefore it can't be updated here
         pass
+
+    def lookup_guid(self, synth_round, user_id):
+        """
+        Given a synth round and a user id in that round, lookup and return the user's assigned GUID.
+
+        :param synth_round: the SynthRound
+        :param user_id: the user's ID in the synth round
+        :return: the guid or None if no guid was identified
+        """
+        user_id = int(user_id)
+        column = Users.Columns.id_column(synth_round)
+        for guid, row in self.data.items():
+            if row[column.value] and int(row[column.value]) == user_id:
+                return guid
+
+    def lookup_age(self, synth_round, user_guid):
+        """
+        Given a synth round and a user's guid, lookup and return the age of the user in that round.
+
+        :param synth_round: the SynthRound
+        :param user_guid: the user's guid
+        :return: the user's age during the round
+        """
+        return self.data[user_guid][Users.Columns.age_column(synth_round).value]
 
 
 class RegisterResourcesStep(Step):

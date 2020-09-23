@@ -117,9 +117,10 @@ class VisitorProject(Base):
     objectives = Column(Text)
     achievements = Column(Text)
     user_guid = Column(BigInteger)
+    user_age_range = Column(Text)
     length_of_visit = Column(Integer)
-    start_date = Column(DateTime)
-    finish_date = Column(Text)
+    start = Column(DateTime)
+    end = Column(DateTime)
     # TODO: fk
     taf_id = Column(Integer)
     home_facilities = Column(Boolean)
@@ -129,14 +130,15 @@ class VisitorProject(Base):
     summary = Column(Text)
     new_user = Column(Boolean)
     facility_reasons = Column(Text)
-    submission_date = Column(DateTime)
+    # TODO: datetime!
+    submission_date = Column(Text)
     support_final = Column(Boolean)
     # TODO: fk?
     project_discipline = Column(Integer)
     # TODO: fk?
     project_specific_discipline = Column(Integer)
     # TODO: datetime?
-    call_submitted = Column(Text)
+    call_submitted = Column(Integer, ForeignKey(Call.id))
     previous_application = Column(Boolean)
     training_requirement = Column(Text)
     # TODO: fk?
@@ -156,10 +158,9 @@ class VisitorProject(Base):
     gender = Column(Text)
     nationality = Column(Integer, ForeignKey(Country.id))
     researcher_status = Column(Text)
-    # TODO: fk for all 3 of these
-    researcher_discipline1 = Column(Text)
-    researcher_discipline2 = Column(Text)
-    researcher_discipline3 = Column(Text)
+    researcher_discipline1 = Column(Integer, ForeignKey(Discipline.id))
+    researcher_discipline2 = Column(Integer, ForeignKey(Discipline.id))
+    researcher_discipline3 = Column(Integer, ForeignKey(Discipline.id))
     home_institution_type = Column(Text)
     home_institution_dept = Column(Text)
     home_institution_name = Column(Text)

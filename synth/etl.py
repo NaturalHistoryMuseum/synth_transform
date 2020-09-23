@@ -7,9 +7,10 @@ from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
-from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output
+from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output, \
+    VisitorProject
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
-    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput
+    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource
 from synth.utils import Step, SynthRound, find_doi
 
@@ -40,6 +41,7 @@ def etl_steps(with_data=True):
             FillSpecificDisciplineTable,
             FillOutputTable,
             CleanOutputsTable,
+            FillVisitorProjectTable,
         )])
 
     return steps
@@ -331,3 +333,113 @@ class CleanOutputsTable(Step):
                 handled.add(output.id)
 
         # TODO: add more ways of matching outputs in the Crossref API
+
+
+class FillVisitorProjectTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill VisitorProject table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the monster VisitorProject table with data. This data is a mix of stuff from the source
+        projects and users tables (TListOfUserProject and TListOfUser).
+
+        :param context:
+        :param target:
+        :param synth_sources:
+        :return:
+        """
+        users = context.resources[Resource.USERS]
+
+        for synth_round, source in zip(SynthRound, synth_sources):
+            # grab only the projects that have been "completed"
+            projects = source.query(TListOfUserProject) \
+                .filter(TListOfUserProject.Application_State != 'edit') \
+                .order_by(TListOfUserProject.UserProject_ID.asc())
+
+            for project in projects:
+                user_guid = users.lookup_guid(synth_round, project.User_ID)
+                if user_guid is None:
+                    # print(f'missing guid for user {project.User_ID} on project '
+                    #       f'{project.UserProject_ID} in synth {synth_round.value}')
+                    continue
+
+                user = source.query(TListOfUser).get(project.User_ID)
+                try:
+                    call_submitted = context.mapping_get(t_NHM_Call, int(project.Call_Submitted),
+                                                         synth=synth_round)
+                except ValueError:
+                    call_submitted = None
+
+                visitor_project = VisitorProject(
+                    ############ project based info ############
+                    title=project.UserProject_Title,
+                    objectives=project.UserProject_Objectives,
+                    achievements=project.UserProject_Achievements,
+                    user_guid=user_guid,
+                    user_age_range=users.lookup_age(synth_round, user_guid),
+                    length_of_visit=project.length_of_visit,
+                    start=project.start_date,
+                    end=project.finish_date,
+                    taf_id=project.TAF_ID,
+                    # TODO: check for nulls
+                    home_facilities=bool(project.Home_Facilities),
+                    application_state=project.Application_State,
+                    acceptance=project.Acceptance,
+                    summary=project.UserProject_Summary,
+                    # TODO: check for nulls
+                    new_user=bool(project.New_User),
+                    facility_reasons=project.UserProject_Facility_Reasons,
+                    # TODO: convert to datetime
+                    submission_date=project.Submission_Date,
+                    # TODO: check for nulls
+                    support_final=bool(project.Support_Final),
+                    # note that all projects have the same ids for this table so this is fine
+                    project_discipline=project.Project_Discipline,
+                    project_specific_discipline=context.mapping_get(
+                        NHMSpecificDiscipline, project.Project_Specific_Discipline,
+                        synth=synth_round),
+                    call_submitted=call_submitted,
+                    # TODO: check for nulls
+                    previous_application=bool(project.Previous_Application),
+                    training_requirement=project.Training_Requirement,
+                    # TODO: should use lookup and get id for?
+                    supporter_institution=project.Supporter_Institution,
+                    administration_state=project.Administration_State,
+                    # TODO: check for nulls
+                    group_leader=bool(project.Group_leader),
+                    group_members=project.Group_Members,
+                    background=project.UserProject_Background,
+                    reasons=project.UserProject_Reasons,
+                    expectations=project.UserProject_Expectations,
+                    outputs=project.UserProject_Outputs,
+                    # TODO: should use lookup and get id for?
+                    group_leader_institution=project.Group_Leader_Institution,
+                    visit_funded_previously=project.Visit_Funded_Previously,
+
+                    ############ user based info ############
+                    # TODO: standardise to an enum?
+                    gender=user.Gender,
+                    nationality=context.mapping_get(CountryIsoCode, user.Nationality_Country_code),
+                    researcher_status=user.Researcher_status,
+                    researcher_discipline1=user.Discipline1,
+                    researcher_discipline2=user.Discipline2,
+                    researcher_discipline3=user.Discipline3,
+                    home_institution_type=user.Home_Institution_Type,
+                    home_institution_dept=user.Home_Institution_Dept,
+                    home_institution_name=user.Home_Institution_Name,
+                    home_institution_town=user.Home_Institution_Town,
+                    home_institution_country=context.mapping_get(
+                        CountryIsoCode, user.Home_Institution_Country_code),
+                    home_institution_postcode=user.Home_Institution_Postcode,
+                    number_of_visits=user.Number_of_visits,
+                    duration_of_stays=user.Duration_of_stays,
+                    nationality_other=user.Nationality_OtherText,
+                    remote_user=user.Remote_user,
+                    travel_and_subsistence_reimbursed=user.Travel_and_Subsistence_reimbursed,
+                    job_title=user.jobTitle
+                )
+
+                target.add(visitor_project)
