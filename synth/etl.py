@@ -392,30 +392,25 @@ class FillVisitorProjectTable(Step):
                     start=project.start_date,
                     end=project.finish_date,
                     taf_id=project.TAF_ID,
-                    # TODO: check for nulls
                     home_facilities=bool(project.Home_Facilities),
                     application_state=project.Application_State,
                     acceptance=project.Acceptance,
                     summary=project.UserProject_Summary,
-                    # TODO: check for nulls
                     new_user=bool(project.New_User),
                     facility_reasons=project.UserProject_Facility_Reasons,
                     # TODO: convert to datetime
                     submission_date=project.Submission_Date,
-                    # TODO: check for nulls
                     support_final=bool(project.Support_Final),
                     # note that all projects have the same ids for this table so this is fine
                     project_discipline=project.Project_Discipline,
                     project_specific_discipline=context.translate(
                         NHMSpecificDiscipline, project.Project_Specific_Discipline, synth_round),
                     call_submitted=call_submitted,
-                    # TODO: check for nulls
                     previous_application=bool(project.Previous_Application),
                     training_requirement=project.Training_Requirement,
                     # TODO: should use lookup and get id for?
                     supporter_institution=project.Supporter_Institution,
                     administration_state=project.Administration_State,
-                    # TODO: check for nulls
                     group_leader=bool(project.Group_leader),
                     group_members=project.Group_Members,
                     background=project.UserProject_Background,
