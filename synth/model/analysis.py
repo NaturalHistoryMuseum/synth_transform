@@ -131,7 +131,7 @@ class VisitorProject(Base):
     new_user = Column(Boolean)
     facility_reasons = Column(Text)
     # TODO: datetime!
-    submission_date = Column(Text)
+    submission_date = Column(DateTime)
     support_final = Column(Boolean)
     # TODO: fk?
     project_discipline = Column(Integer)
