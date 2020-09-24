@@ -362,6 +362,12 @@ class FillVisitorProjectTable(Step):
                 .filter(TListOfUserProject.Application_State != 'edit') \
                 .order_by(TListOfUserProject.UserProject_ID.asc())
 
+            # grab a list of the calls for this synth round, in order
+            calls = target.query(Call)\
+                .filter(Call.round_id == synth_round.value)\
+                .order_by(Call.id.asc())\
+                .all()
+
             for project in projects:
                 user_guid = users.lookup_guid(synth_round, project.User_ID)
                 if user_guid is None:
@@ -371,12 +377,9 @@ class FillVisitorProjectTable(Step):
                     continue
 
                 user = source.query(TListOfUser).get(project.User_ID)
-                try:
-                    call_submitted = context.translate(t_NHM_Call, int(project.Call_Submitted),
-                                                       synth_round)
-                except ValueError:
-                    # the original project.Call_Submitted data wasn't an int, just null it
-                    call_submitted = None
+
+                # work out which call the project was submitted against
+                call_submitted = calls[int(project.Call_Submitted) - 1].id
 
                 visitor_project = VisitorProject(
                     ############ project based info ############
