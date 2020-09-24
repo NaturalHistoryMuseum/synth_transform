@@ -50,6 +50,22 @@ def find_doi(string):
         return doi_match.group()
 
 
+def to_datetime(value, date_format='%a %b %d %H:%M:%S %Z %Y'):
+    """
+    Converts the given string to a datetime and returns it. If the value passed is falsey then None
+    is returned, otherwise this is exactly the same as calling datetime.strptime(value, date_format)
+    directly.
+
+    :param value: the date as a string
+    :param date_format: the format the date is in
+    :return: a datetime or None
+    """
+    if not value:
+        return None
+    # Wed Sep 15 10:36:54 BST 2004
+    return datetime.strptime(value, date_format)
+
+
 @contextmanager
 def task(message, done='Done', time=True):
     """

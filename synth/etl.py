@@ -12,7 +12,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, find_doi
+from synth.utils import Step, SynthRound, find_doi, to_datetime
 
 
 def etl_steps(with_data=True):
@@ -398,8 +398,7 @@ class FillVisitorProjectTable(Step):
                     summary=project.UserProject_Summary,
                     new_user=bool(project.New_User),
                     facility_reasons=project.UserProject_Facility_Reasons,
-                    # TODO: convert to datetime
-                    submission_date=project.Submission_Date,
+                    submission_date=to_datetime(project.Submission_Date),
                     support_final=bool(project.Support_Final),
                     # note that all projects have the same ids for this table so this is fine
                     project_discipline=project.Project_Discipline,
