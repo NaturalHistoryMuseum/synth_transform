@@ -422,7 +422,6 @@ class FillVisitorProjectTable(Step):
                     visit_funded_previously=project.Visit_Funded_Previously,
 
                     ############ user based info ############
-                    # TODO: standardise to an enum?
                     gender=user.Gender,
                     nationality=context.translate(CountryIsoCode, user.Nationality_Country_code,
                                                   synth_round),
