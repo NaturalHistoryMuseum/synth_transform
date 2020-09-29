@@ -85,7 +85,7 @@ class CreateAnalysisDB(Step):
 
     @property
     def message(self):
-        return 'Create new target database using model (if necessary)'
+        return 'Create new target database using model'
 
     def run(self, context, *args, **kwargs):
         if not database_exists(context.config.target):
