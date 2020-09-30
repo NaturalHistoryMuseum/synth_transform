@@ -61,7 +61,15 @@ def find_doi(string):
     doi_regex = re.compile(r'10.\d{4,9}/[-._;()/:A-Z0-9]+', re.I)
     doi_match = doi_regex.search(string)
     if doi_match:
-        return doi_match.group()
+        doi = doi_match.group()
+        # DOIs are case insensitive so convert everything to uppercase
+        # https://www.doi.org/doi_handbook/2_Numbering.html#2.4
+        doi = doi.upper()
+        # strip trailing full stops
+        doi = doi.rstrip('.')
+        return doi
+
+
 def find_names(author_string):
     """
     Attempts to find names in the given string using regexes. Usually only finds family names, as most names have been
