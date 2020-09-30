@@ -8,6 +8,8 @@ from datetime import datetime
 import click
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import warnings
+from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 
 
 @enum.unique
@@ -48,6 +50,38 @@ def find_doi(string):
     doi_match = doi_regex.search(string)
     if doi_match:
         return doi_match.group()
+def find_names(author_string):
+    """
+    Attempts to find names in the given string using regexes. Usually only finds family names, as most names have been
+    specified as (e.g.) "FamilyName, A. B.".
+    """
+    and_regex = re.compile(r'( and |&)', re.I)
+    name_regex = re.compile(r"([^\W\d_]{3,}[-' ]?)+")
+    if and_regex.search(author_string) is not None:
+        author_string = and_regex.sub('; ', author_string)
+    names = name_regex.findall(author_string)
+    return names
+
+
+def clean_authors(author_string):
+    """
+    Attempts to remove HTML and unwanted characters from author strings.
+    """
+    unwanted_chars_rgx = re.compile(r'[\r\n\t]+')
+    alphanum = re.compile(r'\w')
+    multi_space_rgx = re.compile(r'\s{2,}')
+    start_space_rgx = re.compile(r'^\s+')
+    author_text = unwanted_chars_rgx.sub(' ', author_string)
+    if len(author_text) == 0:
+        return
+    with warnings.catch_warnings():
+        # otherwise we get bs4 warnings when authors doesn't have HTML in it
+        warnings.simplefilter('ignore', category=MarkupResemblesLocatorWarning)
+        author_soup = BeautifulSoup(author_text, 'lxml').text.replace('\xa0', ' ')
+    if alphanum.search(author_soup) is None:
+        return
+    else:
+        return start_space_rgx.sub('', multi_space_rgx.sub(' ', author_soup))
 
 
 def to_datetime(value, date_format='%a %b %d %H:%M:%S %Z %Y'):

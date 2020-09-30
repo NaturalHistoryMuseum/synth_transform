@@ -2,7 +2,7 @@ import itertools
 import subprocess
 
 import pycountry
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, or_
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
@@ -12,7 +12,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, find_doi, to_datetime
+from synth.utils import Step, SynthRound, find_doi, clean_authors, to_datetime
 
 
 def etl_steps(with_data=True):
@@ -298,28 +298,28 @@ class CleanOutputsTable(Step):
         return 'Clean the outputs table up'
 
     @staticmethod
-    def update_output_from_doi(output, doi):
+    def update_output_from_doi_metadata(output, doi_metadata):
         """
         Given an Output model object and a dict of DOI metadata, update the Output object with the
         metadata from the DOI metadata dict.
 
         :param output: an Output model object
-        :param doi: a dict of DOI metadata from Crossref's API
+        :param doi_metadata: a dict of DOI metadata from Crossref's API
         """
         authors = []
-        for author in doi['author']:
+        for author in doi_metadata.get('author', []):
             if 'given' in author and 'family' in author:
                 authors.append(f"{author['family']} {author['given']}")
 
         output.authors = '; '.join(authors)
-        output.year = int(doi['created']['date-time'][:4])
-        output.title = doi['title'][0]
-        output.publisher = doi['publisher']
-        output.url = doi['URL']
-        if 'volume' in doi:
-            output.volume = doi['volume']
-        if 'page' in doi:
-            output.pages = doi['page']
+        output.year = int(doi_metadata['created']['date-time'][:4])
+        output.title = doi_metadata['title'][0]
+        output.publisher = doi_metadata['publisher']
+        output.url = doi_metadata['URL']
+        if 'volume' in doi_metadata:
+            output.volume = doi_metadata['volume']
+        if 'page' in doi_metadata:
+            output.pages = doi_metadata['page']
 
     def run(self, context, target, *args, **kwargs):
         """
@@ -327,15 +327,25 @@ class CleanOutputsTable(Step):
         table to papers in Crossref's API.
         """
         handled = set()
-        # look for DOIs first cause they should be able to provide us with nice clean metadata
-        for output in target.query(Output).filter(Output.url.ilike('%doi%')):
-            doi = find_doi(output.url)
-            doi_metadata = context.resources[Resource.DOIS].get(doi, None)
-            if doi_metadata:
-                self.update_output_from_doi(output, doi_metadata)
-                handled.add(output.id)
 
-        # TODO: add more ways of matching outputs in the Crossref API
+        # look for DOIs first cause they should be able to provide us with nice clean metadata
+        def _search_column(colname):
+            for output in target.query(Output).filter(
+                    or_(getattr(Output, colname).ilike('%doi%'), getattr(Output, colname).ilike('%10.%/%'))):
+                doi = find_doi(getattr(output, colname))
+                doi_metadata = context.resources[Resource.DOIS].get(doi, None)
+                if doi_metadata:
+                    self.update_output_from_doi_metadata(output, doi_metadata)
+                    handled.add(output.id)
+
+        _search_column('url')
+        _search_column('volume')
+        _search_column('pages')
+
+        # attempt to clean up the authors to make it easier to search for them later
+        for output in target.query(Output).filter(Output.id.notin_(handled), Output.authors.isnot(None),
+                                                  Output.authors != ''):
+            output.authors = clean_authors(output.authors)
 
 
 class FillVisitorProjectTable(Step):
@@ -363,9 +373,9 @@ class FillVisitorProjectTable(Step):
                 .order_by(TListOfUserProject.UserProject_ID.asc())
 
             # grab a list of the calls for this synth round, in order
-            calls = target.query(Call)\
-                .filter(Call.round_id == synth_round.value)\
-                .order_by(Call.id.asc())\
+            calls = target.query(Call) \
+                .filter(Call.round_id == synth_round.value) \
+                .order_by(Call.id.asc()) \
                 .all()
 
             for project in projects:
