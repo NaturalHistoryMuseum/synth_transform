@@ -130,14 +130,10 @@ class VisitorProject(Base):
     summary = Column(Text)
     new_user = Column(Boolean)
     facility_reasons = Column(Text)
-    # TODO: datetime!
-    submission_date = Column(Text)
+    submission_date = Column(DateTime)
     support_final = Column(Boolean)
-    # TODO: fk?
-    project_discipline = Column(Integer)
-    # TODO: fk?
-    project_specific_discipline = Column(Integer)
-    # TODO: datetime?
+    project_discipline = Column(Integer, ForeignKey(Discipline.id))
+    project_specific_discipline = Column(Integer, ForeignKey(SpecificDiscipline.id))
     call_submitted = Column(Integer, ForeignKey(Call.id))
     previous_application = Column(Boolean)
     training_requirement = Column(Text)
@@ -154,7 +150,6 @@ class VisitorProject(Base):
     # TODO: fk?
     group_leader_institution = Column(Text)
     visit_funded_previously = Column(Boolean)
-    # TODO: enum?
     gender = Column(Text)
     nationality = Column(Integer, ForeignKey(Country.id))
     researcher_status = Column(Text)
@@ -171,6 +166,6 @@ class VisitorProject(Base):
     duration_of_stays = Column(Integer)
     nationality_other = Column(Text)
     remote_user = Column(Text)
-    # TODO: boolean?
+    # TODO: there's no data in this column in any of the synth databases, do we need it?
     travel_and_subsistence_reimbursed = Column(Text)
     job_title = Column(Text)
