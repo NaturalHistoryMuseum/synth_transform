@@ -29,13 +29,25 @@ class Config:
     run.
     """
 
-    def __init__(self, sources, target):
+    def __init__(self, sources, target, resources=None):
         """
         :param sources: the database URLs of the source schemas, must be in chronological order
         :param target: the database URL of the schema to output to
         """
         self.sources = sources
         self.target = target
+        self._resources = resources or {}
+
+    def resource_opt(self, config_option, default=None):
+        """
+        Convenience method to retrieve an option that may or may not be defined.
+        :param config_option: a dot-delimited string describing the option, e.g. "doi.refresh"
+        """
+        config_value = self._resources
+        levels = config_option.split('.')
+        for i, k in enumerate(levels):
+            config_value = config_value.get(k, {} if i < len(levels) - 1 else default)
+        return config_value
 
 
 def find_doi(string):
