@@ -107,7 +107,7 @@ To do this it drops and recreates all the tables in the analytics database and t
 steps to copy the data over, transforming it as it goes.
 
 
-### `update`
+#### `update`
 ```bash
 synth update
 synth update --name <name>
@@ -126,7 +126,7 @@ The names of the resources are listed below in the [_Supplementary Data_](#suppl
 section.
 
 
-### `outputs`
+#### `outputs`
 ```bash
 synth outputs
 synth outputs --name <name>
