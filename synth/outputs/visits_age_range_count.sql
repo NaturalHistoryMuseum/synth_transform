@@ -5,6 +5,6 @@ select
 from VisitorProject vp
     join `Call` c on vp.call_submitted = c.id
     join Round r on c.round_id = r.id
-where length_of_visit > 0
+where vp.length_of_visit > 0
 group by r.name, vp.user_age_range
-order by r.name, user_age_range;
+order by r.name, vp.user_age_range;
