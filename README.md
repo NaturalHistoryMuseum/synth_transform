@@ -126,6 +126,18 @@ The names of the resources are listed below in the [_Supplementary Data_](#suppl
 section.
 
 
+### `outputs`
+```bash
+synth outputs
+synth outputs --name <name>
+synth outputs --name <name> --name <name> ...
+```
+
+Updates the outputs data.
+It is possible to specify which outputs to update using the `--name` option which can be specified
+multiple times to only update a set of names.
+
+
 ## Supplementary Data
 In the `data` directory there are some supplementary files which are listed below along with their
 source.
