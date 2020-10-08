@@ -115,11 +115,15 @@ synth update --name <name> --name <name> ...
 ```
 
 Updates the supplementary data (if possible).
-It is possible to specify which resources to update using the `--name` option which can be specified multiple times to only update a set of names.
+It is possible to specify which resources to update using the `--name` option which can be specified
+multiple times to only update a set of names.
 
-At present this command can take 20+ mins to run due to the [DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json) which is pulled from the Crossref API.
+At present this command can take 20+ mins to run due to the
+[DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json)
+which is pulled from the Crossref API.
 
-The names of the resources are listed below in the [_Supplementary Data_](#supplementary-data) section.
+The names of the resources are listed below in the [_Supplementary Data_](#supplementary-data)
+section.
 
 
 ## Supplementary Data
