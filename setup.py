@@ -16,8 +16,13 @@ setup(
         'sqlacodegen~=2.3.0',
         'SQLAlchemy~=1.3.19',
         'sqlalchemy-utils~=0.36.8',
-        'beautifulsoup4',
-        'lxml'
+        'beautifulsoup4~=4.9.1',
+        'lxml~=4.5.2',
+        'fuzzywuzzy~=0.18.0',
+        'python-Levenshtein~=0.12.0',
+        'sqlitedict~=1.7.0',
+        'unidecode~=1.1.1',
+        'untangle~=1.1.1'
     ],
     entry_points='''
         [console_scripts]

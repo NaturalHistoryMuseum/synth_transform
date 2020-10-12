@@ -1,15 +1,15 @@
 import abc
 import enum
 import re
+import warnings
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
 
 import click
+from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import warnings
-from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 
 
 @enum.unique
@@ -50,26 +50,6 @@ class Config:
         return config_value
 
 
-def find_doi(string):
-    """
-    Attempts to find a DOI in the given string using a regex.
-
-    :param string: a string to search
-    :return: the DOI string or None if nothing was found
-    """
-    # regex source: https://www.crossref.org/blog/dois-and-matching-regular-expressions/
-    doi_regex = re.compile(r'10.\d{4,9}/[-._;()/:A-Z0-9]+', re.I)
-    doi_match = doi_regex.search(string)
-    if doi_match:
-        doi = doi_match.group()
-        # DOIs are case insensitive so convert everything to uppercase
-        # https://www.doi.org/doi_handbook/2_Numbering.html#2.4
-        doi = doi.upper()
-        # strip trailing full stops
-        doi = doi.rstrip('.')
-        return doi
-
-
 def find_names(author_string):
     """
     Attempts to find names in the given string using regexes. Usually only finds family names, as most names have been
@@ -83,25 +63,25 @@ def find_names(author_string):
     return names
 
 
-def clean_authors(author_string):
+def clean_string(string):
     """
-    Attempts to remove HTML and unwanted characters from author strings.
+    Attempts to remove HTML and unwanted characters from strings.
     """
     unwanted_chars_rgx = re.compile(r'[\r\n\t]+')
     alphanum = re.compile(r'\w')
     multi_space_rgx = re.compile(r'\s{2,}')
     start_space_rgx = re.compile(r'^\s+')
-    author_text = unwanted_chars_rgx.sub(' ', author_string)
-    if len(author_text) == 0:
+    text = unwanted_chars_rgx.sub(' ', string)
+    if len(text) == 0:
         return
     with warnings.catch_warnings():
-        # otherwise we get bs4 warnings when authors doesn't have HTML in it
+        # otherwise we get bs4 warnings when string doesn't have HTML in it
         warnings.simplefilter('ignore', category=MarkupResemblesLocatorWarning)
-        author_soup = BeautifulSoup(author_text, 'lxml').text.replace('\xa0', ' ')
-    if alphanum.search(author_soup) is None:
+        soup = BeautifulSoup(text, 'lxml').text.replace('\xa0', ' ')
+    if alphanum.search(soup) is None:
         return
     else:
-        return start_space_rgx.sub('', multi_space_rgx.sub(' ', author_soup))
+        return start_space_rgx.sub('', multi_space_rgx.sub(' ', soup))
 
 
 def to_datetime(value, date_format='%a %b %d %H:%M:%S %Z %Y'):
