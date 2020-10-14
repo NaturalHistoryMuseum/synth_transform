@@ -4,13 +4,14 @@ import enum
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from datetime import datetime as dt
+
 import click
 import requests
 from crossref.restful import Works, Etiquette
 from fuzzywuzzy import fuzz
 from sqlalchemy import or_
 from sqlitedict import SqliteDict
+from tqdm import tqdm
 
 from synth.errors import DuplicateUserGUIDError
 from synth.model.rco_synthsys_live import NHMOutput
@@ -197,14 +198,24 @@ class OutputDOIMatches(SqliteDataResource):
         self._added = set()
         self._errors = {}
         self._methods = {}
-        self._dois = {}
 
     @property
     def keys(self):
-        return [int(k) for k in self.data.keys()]
+        return [tuple(json.loads(k)) for k in self.data.keys()]
 
-    def _search_output(self, output):
-        self._handled.add(output.Output_ID)
+    def mapped_items(self, new_id_map):
+        mapped = {}
+        for k, v in self.data.items():
+            try:
+                new_key = new_id_map[tuple(json.loads(k))]
+                mapped[new_key] = v
+            except KeyError:
+                continue
+        return mapped
+
+    def _search_output(self, conn, output, db_ix, bar):
+        output_key = json.dumps((db_ix, output.Output_ID))
+        self._handled.add(output_key)
         try:
             authors = find_names(clean_string(output.Authors) or '')
             title = output.Title.rstrip('.')
@@ -214,14 +225,14 @@ class OutputDOIMatches(SqliteDataResource):
                 if result_title is None:
                     continue
                 similarity = fuzz.partial_ratio(result_title, title.lower())
-                if similarity > 90:
+                if similarity > 80:
                     self._added.add(output.Output_ID)
-                    # have to check it's empty first
-                    if self._dois.get(str(output.Output_ID), None) is None:
-                        self._dois[str(output.Output_ID)] = result['DOI'].upper()
-                    self._methods[output.Output_ID] = 'crossref'
+                    conn.add(output_key, result['DOI'].upper())
+                    self._methods[output_key] = 'crossref'
+                    bar.update(1)
                     return
                 if ri >= 3 - 1:
+                    bar.update(1)
                     return
             # refindit also searches a few other databases, so try that if crossref doesn't find it
             refindit_url = 'https://refinder.org/find?search=advanced&limit=5&title=' \
@@ -233,38 +244,53 @@ class OutputDOIMatches(SqliteDataResource):
                     if result_title is None:
                         continue
                     similarity = fuzz.partial_ratio(result_title, title.lower())
-                    if similarity > 90:
+                    if similarity > 80:
                         self._added.add(output.Output_ID)
-                        if self._dois.get(str(output.Output_ID), None) is None:
-                            self._dois[str(output.Output_ID)] = result['DOI'].upper()
-                        self._methods[output.Output_ID] = 'refindit'
+                        conn.add(output_key, result['DOI'].upper())
+                        self._methods[output_key] = 'refindit'
+                        bar.update(1)
                         return
         except Exception as e:
-            self._errors[output.Output_ID] = e
-        print(f'\r{len(self._handled)}', end='')
+            self._errors[(db_ix, output.Output_ID)] = e
+            bar.update(1)
 
     def update(self, context, target, *synth_sources):
+        print()
         self._handled = set()
-        self._added = set()
         self._errors = {}
         self._methods = {}
-        self._dois = {}
 
-        for synth_db in synth_sources:
+        for db_ix, synth_db in enumerate(synth_sources):
+            db_ix += 1
+            self._added = set()
+
+            def _extract_doi(conn, output, col, bar):
+                output_key = json.dumps((db_ix, output.Output_ID))
+                self._handled.add(output_key)
+                for x in DOIExtractor.dois(getattr(output, col), fix=True):
+                    doi, fn = x
+                    doi_metadata = self.works.doi(doi)
+                    if doi_metadata:
+                        doi_title = doi_metadata.get('title', '')
+                        doi_title = clean_string(doi_title[0]).lower()
+                        output_title = output.Title
+                        if output_title is not None:
+                            output_title = clean_string(output_title.lower())
+                        match = fuzz.partial_ratio(doi_title, output_title)
+                        if match > 50:
+                            self._added.add(output.Output_ID)
+                            conn.add(output_key, doi.upper())
+                            self._methods[output_key] = fn
+                            break
+                bar.update(1)
+
             def _search_columns(col, *filters):
                 outputs = synth_db.query(NHMOutput).filter(NHMOutput.Output_ID.notin_(self._added), *filters)
-                with self, click.progressbar(outputs, length=outputs.count(), label=col) as bar:
-                    for output in bar:
-                        self._handled.add(output.Output_ID)
-                        for x in DOIExtractor.dois(getattr(output, col), fix=True):
-                            doi, fn = x
-                            doi_metadata = self.works.doi(doi)
-                            if doi_metadata:
-                                self._added.add(output.Output_ID)
-                                if self._dois.get(str(output.Output_ID), None) is None:
-                                    self._dois[str(output.Output_ID)] = doi.upper()
-                                self._methods[output.Output_ID] = fn
-                                break
+                pbar = tqdm(total=outputs.count(), desc=col, unit=' records', leave=False)
+                thread_workers = 20
+                with self, ThreadPoolExecutor(thread_workers) as thread_executor:
+                    thread_executor.map(lambda x: _extract_doi(self, x, col, pbar), outputs.all())
+                pbar.close()
 
             _search_columns('URL', NHMOutput.URL.isnot(None))
             _search_columns('Volume', or_(NHMOutput.Volume.ilike('%doi%'), NHMOutput.Volume.ilike('%10.%/%')))
@@ -275,21 +301,16 @@ class OutputDOIMatches(SqliteDataResource):
                                                                 NHMOutput.Title.isnot(None),
                                                                 NHMOutput.Authors.isnot(None))
 
+            progress_bar = tqdm(total=title_and_author.count(), desc='Crossref', unit=' records', leave=False)
             workers = 20
-            with ThreadPoolExecutor(workers) as executor:
-                executor.map(lambda x: self._search_output(x), title_and_author.all())
-
-            with self:
-                for k, v in self._dois.items():
-                    self.add(k, v)
-            print()
+            with self, ThreadPoolExecutor(workers) as executor:
+                executor.map(lambda x: self._search_output(self, x, db_ix, progress_bar), title_and_author.all())
+            progress_bar.close()
 
         methods = {}
         for k, v in self._methods.items():
             methods[v] = methods.get(v, []) + [k]
 
-        click.echo(len(self._handled))
-        click.echo(len(self._added))
         for k, v in methods.items():
             click.echo(f'{k}: {len(v)}')
 

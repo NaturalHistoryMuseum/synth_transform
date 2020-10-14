@@ -1,10 +1,8 @@
 import itertools
 import subprocess
-from datetime import datetime as dt, timedelta
 
 import pycountry
-from fuzzywuzzy import fuzz
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import create_engine, func
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
@@ -13,9 +11,8 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
     VisitorProject
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
-from synth.parsers.doi import DOIExtractor
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, clean_string, to_datetime, find_names
+from synth.utils import Step, SynthRound, clean_string, to_datetime
 
 
 def etl_steps(with_data=True):
@@ -318,7 +315,7 @@ class CleanOutputsTable(Step):
         if len(titles) == 0:
             title = output.title
         else:
-            title = titles[0]
+            title = clean_string(titles[0])
 
         output.authors = '; '.join(authors)
         output.year = int(doi_metadata['created']['date-time'][:4])
@@ -352,9 +349,10 @@ class CleanOutputsTable(Step):
 
         # update from the cached matched DOIs and metadata (recommended that the update methods are run before this)
         with doi_cache, metadata_cache:
-            for output in target.query(Output).filter(Output.id.in_(doi_cache.keys)):
+            mapped_items = doi_cache.mapped_items(context.mappings[NHMOutput])
+            for output in target.query(Output).filter(Output.id.in_(mapped_items.keys())):
                 handled.add(output.id)
-                doi = doi_cache.get(output.id)
+                doi = mapped_items.get(output.id)
                 if doi is not None:
                     doi_metadata = metadata_cache.get(doi)
                     if doi_metadata:
