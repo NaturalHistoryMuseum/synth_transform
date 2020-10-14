@@ -2,6 +2,7 @@ import abc
 import csv
 import enum
 import json
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -23,8 +24,8 @@ from synth.utils import Step, SynthRound, find_names, clean_string
 class Resource(enum.Enum):
     INSTITUTIONS = 'institutions'
     DOIS = 'dois'
+    DOIMETADATA = 'doimetadata'
     USERS = 'users'
-    DOIMATCHES = 'doimatches'
 
 
 class DataResource(abc.ABC):
@@ -131,13 +132,11 @@ class Institutions(JSONDataResource):
         super().update()
 
 
-class OutputDOIs(SqliteDataResource):
+class DOIMetadata(SqliteDataResource):
     """
-    This resource is a cached set of DOI metadata pulled from Crossref's API for the DOIs present in
-    the source synth databases. Having this cached speeds up the ETL processing and reduces our
-    calls to the Crossref API which is the nice thing to do.
-
-    Note that updating the cache can take about ~20 mins or so.
+    This resource is a cached set of DOI metadata pulled from Crossref's API for the DOIs saved in the OutputDOIs
+    resource. Having this cached speeds up the ETL processing and reduces our calls to the Crossref API which is the
+    nice thing to do.
     """
 
     def __init__(self, context):
@@ -167,7 +166,7 @@ class OutputDOIs(SqliteDataResource):
         self._added = set()
         self._errors = {}
 
-        doi_cache = OutputDOIMatches(context)
+        doi_cache = OutputDOIs(context)
         with doi_cache:
             found_dois = list(set(doi_cache.data.values()))
 
@@ -180,10 +179,11 @@ class OutputDOIs(SqliteDataResource):
         print()
 
 
-class OutputDOIMatches(SqliteDataResource):
+class OutputDOIs(SqliteDataResource):
     """
-    This resource is a cached set of DOI matches to output IDs, using regexes, URLs, crossref searches, and refindit
-    searches. This resource takes a very long time to update (>24h).
+    This resource is a cached set of output IDs matched to DOIs using regexes, URLs, Crossref searches, and Refindit
+    searches. This resource takes several hours to update, depending on throttling from Crossref and number of threads
+    available for multiprocessing.
     """
 
     def __init__(self, context):
@@ -426,12 +426,13 @@ class RegisterResourcesStep(Step):
         return 'Registering resource data files'
 
     def run(self, context, *args, **kwargs):
-        resources = {
-            Resource.INSTITUTIONS: Institutions(context),
-            Resource.DOIS: OutputDOIs(context),
-            Resource.USERS: Users(context),
-            Resource.DOIMATCHES: OutputDOIMatches(context)
-        }
+        # use an OrderedDict because OutputDOIs should always be run before DOIMetadata
+        resources = OrderedDict((
+            (Resource.INSTITUTIONS, Institutions(context)),
+            (Resource.DOIS, OutputDOIs(context)),
+            (Resource.DOIMETADATA, DOIMetadata(context)),
+            (Resource.USERS, Users(context))
+        ))
         for resource in resources.values():
             resource.load(context, *args, **kwargs)
         context.resources.update(resources)

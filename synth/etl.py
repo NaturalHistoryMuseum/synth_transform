@@ -332,8 +332,8 @@ class CleanOutputsTable(Step):
         Clean up the outputs table in the target database by attempting to match the entries in the
         table to papers in Crossref's API.
         """
-        doi_cache = context.resources[Resource.DOIMATCHES]
-        metadata_cache = context.resources[Resource.DOIS]
+        doi_cache = context.resources[Resource.DOIS]
+        metadata_cache = context.resources[Resource.DOIMETADATA]
         handled = set()
         added = set()
 
