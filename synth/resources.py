@@ -148,20 +148,19 @@ class OutputDOIs(SqliteDataResource):
         self._handled = set()  # all the dois that are checked in this run
         self._added = set()  # all the dois that are added in this run
         self._errors = {}
-        self._metadata = {}
 
-    def _get_metadata(self, doi):
+    def _get_metadata(self, conn, doi, bar):
         if doi is None:
             return
         self._handled.add(doi)
         try:
             doi_metadata = self.works.doi(doi)
             if doi_metadata:
-                self._metadata[doi_metadata['DOI'].upper()] = doi_metadata
+                conn.add(doi_metadata['DOI'].upper(), doi_metadata)
                 self._added.add(doi)
         except Exception as e:
             self._errors[doi] = e
-        print(f'\r{len(self._handled)}', end='')
+        bar.update(1)
 
     def update(self, context, target, *synth_sources):
         self._handled = set()
@@ -172,13 +171,11 @@ class OutputDOIs(SqliteDataResource):
         with doi_cache:
             found_dois = list(set(doi_cache.data.values()))
 
+        progress_bar = tqdm(total=found_dois, desc='Crossref', unit=' dois', leave=False)
         workers = 20
         with self, ThreadPoolExecutor(workers) as executor:
-            executor.map(lambda x: self._get_metadata(x), found_dois)
-
-        with self:
-            for k, v in self._metadata.items():
-                self.add(k, v)
+            executor.map(lambda x: self._get_metadata(self, x, progress_bar), found_dois)
+        progress_bar.close()
 
         print()
 
