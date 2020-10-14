@@ -6,11 +6,15 @@ import untangle
 
 
 class DOIExtractor(object):
+    """
+    A class providing various methods for attempting to extract a DOI from a string.
+    """
     @classmethod
     def dois(cls, string, fix=False):
         """
         Run through all the stages to try and find a DOI in the given string. Does not check if the DOI is valid; the
-        calling function must do this and break at the appropriate point.
+        calling function must do this and break at the appropriate point. If a DOI candidate is found, it is yielded
+        along with the name of the method that extracted it (which can be useful for analyses).
         """
         stages = [
             cls.doi_regex,
@@ -97,6 +101,9 @@ class DOIExtractor(object):
 
     @classmethod
     def nature_regex(cls, string):
+        """
+        Search for a DOI in the format used by Nature.
+        """
         rgx = re.compile(r'(s\d{5}-\d{3}-\d{5}-.)')
         nature = rgx.search(string)
         if nature is not None:
@@ -110,6 +117,9 @@ class DOIExtractor(object):
 
     @classmethod
     def cambridge_regex(cls, string):
+        """
+        Search for a DOI in the format used by Cambridge University Press.
+        """
         rgx = re.compile(r'fileId=(S[A-Z0-9]+)')
         cambridge = rgx.search(string)
         if cambridge is not None:
@@ -118,6 +128,9 @@ class DOIExtractor(object):
 
     @classmethod
     def elsevier_api(cls, string):
+        """
+        Retrieve a DOI using the PII of an Elsevier article.
+        """
         rgx = re.compile(r'([SB][A-Z0-9]{16})')
         elsevier_id = rgx.search(string)
         if elsevier_id is not None:
@@ -130,6 +143,10 @@ class DOIExtractor(object):
 
     @classmethod
     def cambridge_bibtex(cls, string):
+        """
+        Download and parse a bibtex file for a Cambridge University Press article (for older style URLs where the DOI
+        is not present in the URL itself).
+        """
         if 'cambridge.org' not in string:
             return
         original_url = ('http://' if not string.startswith('http') else '') + string
@@ -144,6 +161,9 @@ class DOIExtractor(object):
 
     @classmethod
     def ingenta_bibtex(cls, string):
+        """
+        Download and parse a bibtex file for Ingenta Connect articles.
+        """
         rgx = re.compile(r'(ingentaconnect\.com/.+/\d{4}/\d+/\d+/art\d+)')
         ingenta = rgx.search(string)
         if ingenta is not None:
@@ -154,6 +174,11 @@ class DOIExtractor(object):
 
     @classmethod
     def pensoft_bibtex(cls, string, use_regex_2=False):
+        """
+        Download and parse a bibtex file for articles hosted by Pensoft. May run twice: first with a stricter regex,
+        then with a slightly different regex if the first doesn't produce a DOI. The second regex finds article IDs in
+        older formats and is more prone to error as sometimes these old IDs do not match up to their current IDs.
+        """
         if 'pensoft' not in string and 'zookeys' not in string:
             return
         rgx_1 = r'articles.php\?.*id=(\d+)'
@@ -183,6 +208,9 @@ class DOIExtractor(object):
 
     @classmethod
     def pubmed(cls, string):
+        """
+        Use ReFindIt to search for a PubMed ID.
+        """
         if 'ncbi.nlm.nih.gov' not in string:
             return
         rgx = re.compile(r'(\d{7})')
