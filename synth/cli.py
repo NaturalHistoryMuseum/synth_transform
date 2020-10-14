@@ -95,4 +95,4 @@ if __name__ == '__main__':
     # generate(obj=setup(get_here().parent / 'config.yml'))
     # rebuild(obj=setup(get_here().parent / 'config.yml'))
     # update(obj=setup(get_here().parent / 'config.yml'))
-    pass
+    synth()
