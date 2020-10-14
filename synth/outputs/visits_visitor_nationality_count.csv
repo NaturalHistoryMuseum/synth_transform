@@ -1,0 +1,155 @@
+synth round,visitor nationality country name,visitor nationality country code,count
+Synthesys 1,Austria,AT,76
+Synthesys 1,Belgium,BE,98
+Synthesys 1,Bulgaria,BG,120
+Synthesys 1,Switzerland,CH,37
+Synthesys 1,Cyprus,CY,3
+Synthesys 1,Czechia,CZ,215
+Synthesys 1,Germany,DE,551
+Synthesys 1,Denmark,DK,59
+Synthesys 1,Spain,ES,268
+Synthesys 1,Estonia,EE,34
+Synthesys 1,Finland,FI,37
+Synthesys 1,France,FR,250
+Synthesys 1,United Kingdom,GB,269
+Synthesys 1,Greece,GR,65
+Synthesys 1,Croatia,HR,7
+Synthesys 1,Hungary,HU,107
+Synthesys 1,Ireland,IE,39
+Synthesys 1,Iceland,IS,11
+Synthesys 1,Israel,IL,27
+Synthesys 1,Italy,IT,385
+Synthesys 1,Liechtenstein,LI,2
+Synthesys 1,Lithuania,LT,23
+Synthesys 1,Luxembourg,LU,3
+Synthesys 1,Latvia,LV,6
+Synthesys 1,North Macedonia,MK,1
+Synthesys 1,Malta,MT,4
+Synthesys 1,Netherlands,NL,119
+Synthesys 1,Norway,NO,22
+Synthesys 1,Poland,PL,265
+Synthesys 1,Portugal,PT,123
+Synthesys 1,Romania,RO,71
+Synthesys 1,Serbia,RS,11
+Synthesys 1,Slovakia,SK,57
+Synthesys 1,Slovenia,SI,6
+Synthesys 1,Sweden,SE,44
+Synthesys 1,Turkey,TR,167
+Synthesys 2,Albania,AL,8
+Synthesys 2,Austria,AT,27
+Synthesys 2,Belgium,BE,62
+Synthesys 2,Bulgaria,BG,64
+Synthesys 2,Bosnia and Herzegovina,BA,2
+Synthesys 2,Switzerland,CH,18
+Synthesys 2,Czechia,CZ,119
+Synthesys 2,Germany,DE,269
+Synthesys 2,Denmark,DK,23
+Synthesys 2,Spain,ES,236
+Synthesys 2,Estonia,EE,15
+Synthesys 2,Finland,FI,31
+Synthesys 2,France,FR,129
+Synthesys 2,United Kingdom,GB,122
+Synthesys 2,Greece,GR,56
+Synthesys 2,Croatia,HR,10
+Synthesys 2,Hungary,HU,76
+Synthesys 2,British Indian Ocean Territory,IO,2
+Synthesys 2,Ireland,IE,14
+Synthesys 2,Iceland,IS,3
+Synthesys 2,Israel,IL,39
+Synthesys 2,Italy,IT,289
+Synthesys 2,Lithuania,LT,12
+Synthesys 2,Luxembourg,LU,2
+Synthesys 2,Latvia,LV,10
+Synthesys 2,North Macedonia,MK,8
+Synthesys 2,Malta,MT,1
+Synthesys 2,Montenegro,ME,3
+Synthesys 2,Netherlands,NL,51
+Synthesys 2,Norway,NO,10
+Synthesys 2,Poland,PL,191
+Synthesys 2,Portugal,PT,90
+Synthesys 2,Romania,RO,42
+Synthesys 2,Serbia,RS,20
+Synthesys 2,Slovakia,SK,17
+Synthesys 2,Slovenia,SI,4
+Synthesys 2,Sweden,SE,18
+Synthesys 2,Turkey,TR,74
+Synthesys 3,Albania,AL,5
+Synthesys 3,Austria,AT,41
+Synthesys 3,Belgium,BE,42
+Synthesys 3,Bulgaria,BG,99
+Synthesys 3,Bosnia and Herzegovina,BA,3
+Synthesys 3,Switzerland,CH,19
+Synthesys 3,Cyprus,CY,4
+Synthesys 3,Czechia,CZ,131
+Synthesys 3,Germany,DE,197
+Synthesys 3,Denmark,DK,33
+Synthesys 3,Spain,ES,353
+Synthesys 3,Estonia,EE,8
+Synthesys 3,Finland,FI,11
+Synthesys 3,France,FR,159
+Synthesys 3,Faroe Islands,FO,1
+Synthesys 3,United Kingdom,GB,150
+Synthesys 3,Greece,GR,59
+Synthesys 3,Croatia,HR,43
+Synthesys 3,Hungary,HU,101
+Synthesys 3,British Indian Ocean Territory,IO,1
+Synthesys 3,Ireland,IE,10
+Synthesys 3,Iceland,IS,5
+Synthesys 3,Israel,IL,30
+Synthesys 3,Italy,IT,335
+Synthesys 3,Liechtenstein,LI,2
+Synthesys 3,Lithuania,LT,15
+Synthesys 3,Luxembourg,LU,1
+Synthesys 3,Latvia,LV,10
+Synthesys 3,North Macedonia,MK,10
+Synthesys 3,Malta,MT,1
+Synthesys 3,Montenegro,ME,1
+Synthesys 3,Netherlands,NL,74
+Synthesys 3,Norway,NO,21
+Synthesys 3,Poland,PL,302
+Synthesys 3,Portugal,PT,135
+Synthesys 3,Romania,RO,51
+Synthesys 3,Serbia,RS,55
+Synthesys 3,Slovakia,SK,51
+Synthesys 3,Slovenia,SI,6
+Synthesys 3,Sweden,SE,20
+Synthesys 3,Turkey,TR,81
+Synthesys 4,Albania,AL,1
+Synthesys 4,Armenia,AM,3
+Synthesys 4,Austria,AT,11
+Synthesys 4,Belgium,BE,16
+Synthesys 4,Bulgaria,BG,23
+Synthesys 4,Bosnia and Herzegovina,BA,5
+Synthesys 4,Switzerland,CH,6
+Synthesys 4,Cyprus,CY,1
+Synthesys 4,Czechia,CZ,36
+Synthesys 4,Germany,DE,62
+Synthesys 4,Denmark,DK,6
+Synthesys 4,Spain,ES,145
+Synthesys 4,Estonia,EE,2
+Synthesys 4,Finland,FI,9
+Synthesys 4,France,FR,55
+Synthesys 4,United Kingdom,GB,52
+Synthesys 4,Greece,GR,39
+Synthesys 4,Croatia,HR,16
+Synthesys 4,Hungary,HU,20
+Synthesys 4,British Indian Ocean Territory,IO,1
+Synthesys 4,Ireland,IE,2
+Synthesys 4,Israel,IL,20
+Synthesys 4,Italy,IT,137
+Synthesys 4,Lithuania,LT,6
+Synthesys 4,Latvia,LV,1
+Synthesys 4,"Moldova, Republic of",MD,2
+Synthesys 4,North Macedonia,MK,6
+Synthesys 4,Montenegro,ME,3
+Synthesys 4,Netherlands,NL,15
+Synthesys 4,Norway,NO,4
+Synthesys 4,Poland,PL,74
+Synthesys 4,Portugal,PT,35
+Synthesys 4,Romania,RO,22
+Synthesys 4,Serbia,RS,13
+Synthesys 4,Slovakia,SK,9
+Synthesys 4,Slovenia,SI,4
+Synthesys 4,Sweden,SE,6
+Synthesys 4,Turkey,TR,41
+Synthesys 4,Ukraine,UA,14

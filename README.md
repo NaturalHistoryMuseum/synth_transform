@@ -107,7 +107,7 @@ To do this it drops and recreates all the tables in the analytics database and t
 steps to copy the data over, transforming it as it goes.
 
 
-### `update`
+#### `update`
 ```bash
 synth update
 synth update --name <name>
@@ -115,11 +115,27 @@ synth update --name <name> --name <name> ...
 ```
 
 Updates the supplementary data (if possible).
-It is possible to specify which resources to update using the `--name` option which can be specified multiple times to only update a set of names.
+It is possible to specify which resources to update using the `--name` option which can be specified
+multiple times to only update a set of names.
 
-At present this command can take 20+ mins to run due to the [DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json) which is pulled from the Crossref API.
+At present this command can take 20+ mins to run due to the
+[DOI resource](https://github.com/NaturalHistoryMuseum/synth_transform/blob/main/synth/data/output_dois.json)
+which is pulled from the Crossref API.
 
-The names of the resources are listed below in the [_Supplementary Data_](#supplementary-data) section.
+The names of the resources are listed below in the [_Supplementary Data_](#supplementary-data)
+section.
+
+
+#### `outputs`
+```bash
+synth outputs
+synth outputs --name <name>
+synth outputs --name <name> --name <name> ...
+```
+
+Updates the outputs data.
+It is possible to specify which outputs to update using the `--name` option which can be specified
+multiple times to only update a set of names.
 
 
 ## Supplementary Data
