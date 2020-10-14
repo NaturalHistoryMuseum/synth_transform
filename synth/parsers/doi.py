@@ -153,10 +153,12 @@ class DOIExtractor(object):
             return doi
 
     @classmethod
-    def pensoft_bibtex(cls, string):
+    def pensoft_bibtex(cls, string, use_regex_2=False):
         if 'pensoft' not in string and 'zookeys' not in string:
             return
-        id_rgx = re.compile(r'(?<!_)(?:article_)?id=(\d+)|articles?/(\d+)')
+        rgx_1 = r'articles.php\?.*id=(\d+)'
+        rgx_2 = r'(?<!_)(?:article_)?id=(\d+)|articles?/(\d+)'  # only use if the other format doesn't work
+        id_rgx = re.compile(rgx_2 if use_regex_2 else rgx_1)
         journal_rgx = re.compile(r'([a-z]+)\.pensoft|journals/([a-z]+)')
         pensoft = id_rgx.search(string)
         if pensoft is not None:
@@ -170,6 +172,14 @@ class DOIExtractor(object):
             r = requests.get(url)
             doi = cls.doi_regex(r.text)
             return doi
+        elif not use_regex_2:
+            r = requests.get(string)
+            if r.ok and r.url != string:
+                doi = cls.pensoft_bibtex(r.url)
+                if doi is not None:
+                    return doi
+                else:
+                    return cls.pensoft_bibtex(string, use_regex_2=True)
 
     @classmethod
     def pubmed(cls, string):
