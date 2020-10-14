@@ -22,7 +22,8 @@ setup(
         'python-Levenshtein~=0.12.0',
         'sqlitedict~=1.7.0',
         'unidecode~=1.1.1',
-        'untangle~=1.1.1'
+        'untangle~=1.1.1',
+        'tqdm~=4.50.0'
     ],
     entry_points='''
         [console_scripts]
