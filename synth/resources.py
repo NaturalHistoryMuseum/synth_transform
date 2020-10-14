@@ -57,6 +57,9 @@ class DataResource(abc.ABC):
 
 
 class JSONDataResource(DataResource, abc.ABC):
+    """
+    Class representing a data resource in JSON format.
+    """
 
     def __init__(self, context, path):
         super().__init__(context)
@@ -78,6 +81,9 @@ class JSONDataResource(DataResource, abc.ABC):
 
 
 class SqliteDataResource(DataResource, abc.ABC):
+    """
+    Class representing a data resource in SQLiteDict format (.db file, key-value store).
+    """
 
     def __init__(self, context, path):
         super().__init__(context)
@@ -89,12 +95,18 @@ class SqliteDataResource(DataResource, abc.ABC):
         return list(self.data.keys())
 
     def load(self, *args, **kwargs):
+        """
+        Use 'with x:' syntax instead to prevent resource being left open.
+        """
         pass
 
     def update(self, *args, **kwargs):
+        """
+        Clear the resource, ready for new data.
+        """
         if self.data is None:
             raise Exception('Resource is not open.')
-        self.data.commit()
+        self.data.clear()
 
     def get(self, key, default=None):
         if self.data is None:
@@ -149,6 +161,12 @@ class DOIMetadata(SqliteDataResource):
         self._errors = {}
 
     def _get_metadata(self, conn, doi, bar):
+        """
+        Retrieve metadata for a single DOI and add it to a SqliteDataResource with an open SQLiteDict.
+        :param conn: SqliteDataResource with an open SQLiteDict, e.g. 'self' within 'with self:'
+        :param doi: the DOI to search crossref for
+        :param bar: a tqdm progress bar instance to update
+        """
         if doi is None:
             return
         self._handled.add(doi)
@@ -162,6 +180,10 @@ class DOIMetadata(SqliteDataResource):
         bar.update(1)
 
     def update(self, context, target, *synth_sources):
+        """
+        Retrieve and store metadata for each the DOIs stored in the OutputDOIs resource.
+        """
+        super(DOIMetadata, self).update(context, target, *synth_sources)
         self._handled = set()
         self._added = set()
         self._errors = {}
@@ -171,12 +193,10 @@ class DOIMetadata(SqliteDataResource):
             found_dois = list(set(doi_cache.data.values()))
 
         progress_bar = tqdm(total=found_dois, desc='Crossref', unit=' dois', leave=False)
-        workers = 20
+        workers = context.config.resource_opt('doimetadata.threads', 20)
         with self, ThreadPoolExecutor(workers) as executor:
             executor.map(lambda x: self._get_metadata(self, x, progress_bar), found_dois)
         progress_bar.close()
-
-        print()
 
 
 class OutputDOIs(SqliteDataResource):
@@ -201,6 +221,13 @@ class OutputDOIs(SqliteDataResource):
         return [tuple(json.loads(k)) for k in self.data.keys()]
 
     def mapped_items(self, new_id_map):
+        """
+        Transform the stored keys (tuples of (synth round, output ID)) into new IDs using a map generated during the
+        rebuild process. Resource must be open.
+        :param new_id_map: a dict with tuple keys and new ID values
+        """
+        if self.data is None:
+            raise Exception('Resource is not open.')
         mapped = {}
         for k, v in self.data.items():
             try:
@@ -210,8 +237,17 @@ class OutputDOIs(SqliteDataResource):
                 continue
         return mapped
 
-    def _search_output(self, conn, output, db_ix, bar):
-        output_key = json.dumps((db_ix, output.Output_ID))
+    def _search_output(self, conn, output, synth_round, bar):
+        """
+        Search for a single output using title and author. Searches the Crossref API first, then ReFindIt if that
+        doesn't return a suitable result. Compares the output title with each result using fuzzywuzzy and considers
+        them a match if the two strings are at least 80% similar.
+        :param conn: SqliteDataResource with an open SQLiteDict, e.g. 'self' within 'with self:'
+        :param output: the Output instance we're attempting to find a DOI for
+        :param synth_round: the round this output was recorded in
+        :param bar: a tqdm progress bar instance to update
+        """
+        output_key = json.dumps((synth_round, output.Output_ID))
         self._handled.add(output_key)
         try:
             authors = find_names(clean_string(output.Authors) or '')
@@ -222,7 +258,7 @@ class OutputDOIs(SqliteDataResource):
                 if result_title is None:
                     continue
                 similarity = fuzz.partial_ratio(result_title, title.lower())
-                if similarity > 80:
+                if similarity >= 80:
                     self._added.add(output.Output_ID)
                     conn.add(output_key, result['DOI'].upper())
                     self._methods[output_key] = 'crossref'
@@ -241,18 +277,21 @@ class OutputDOIs(SqliteDataResource):
                     if result_title is None:
                         continue
                     similarity = fuzz.partial_ratio(result_title, title.lower())
-                    if similarity > 80:
+                    if similarity >= 80:
                         self._added.add(output.Output_ID)
                         conn.add(output_key, result['DOI'].upper())
                         self._methods[output_key] = 'refindit'
                         bar.update(1)
                         return
         except Exception as e:
-            self._errors[(db_ix, output.Output_ID)] = e
+            self._errors[(synth_round, output.Output_ID)] = e
             bar.update(1)
 
     def update(self, context, target, *synth_sources):
-        print()
+        """
+        Attempt to find a DOI for each output in the NHMOutput tables.
+        """
+        super(OutputDOIs, self).update(context, target, *synth_sources)
         self._handled = set()
         self._errors = {}
         self._methods = {}
@@ -284,7 +323,7 @@ class OutputDOIs(SqliteDataResource):
             def _search_columns(col, *filters):
                 outputs = synth_db.query(NHMOutput).filter(NHMOutput.Output_ID.notin_(self._added), *filters)
                 pbar = tqdm(total=outputs.count(), desc=col, unit=' records', leave=False)
-                thread_workers = 20
+                thread_workers = context.config.resource_opt('dois.threads', 20)
                 with self, ThreadPoolExecutor(thread_workers) as thread_executor:
                     thread_executor.map(lambda x: _extract_doi(self, x, col, pbar), outputs.all())
                 pbar.close()
@@ -299,7 +338,7 @@ class OutputDOIs(SqliteDataResource):
                                                                 NHMOutput.Authors.isnot(None))
 
             progress_bar = tqdm(total=title_and_author.count(), desc='Crossref', unit=' records', leave=False)
-            workers = 20
+            workers = context.config.resource_opt('dois.threads', 20)
             with self, ThreadPoolExecutor(workers) as executor:
                 executor.map(lambda x: self._search_output(self, x, db_ix, progress_bar), title_and_author.all())
             progress_bar.close()
