@@ -5,3 +5,7 @@ synth.egg-info
 __pycache__
 
 docker-compose.yml
+
+notebooks/.ipynb_checkpoints/
+
+notebooks/mappings.json
