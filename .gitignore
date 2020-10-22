@@ -3,3 +3,4 @@ venv
 *config.yml
 synth.egg-info
 __pycache__
+analysis_db.sql

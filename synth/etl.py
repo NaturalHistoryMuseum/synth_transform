@@ -1,8 +1,11 @@
 import itertools
 import subprocess
+from datetime import datetime
+from numbers import Number
 
 import pycountry
 from sqlalchemy import create_engine, func, or_
+from sqlalchemy.schema import CreateTable
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
@@ -61,6 +64,75 @@ class GenerateSynthDatabaseModel(Step):
     def run(self, context, *args, **kwargs):
         with open(self.filename, 'w') as f:
             subprocess.call(['sqlacodegen', f'{context.config.sources[-1]}'], stdout=f)
+
+
+class DumpAnalysisDatabase(Step):
+    """
+    This step dumps the entire analysis database into a single SQL file containing table creation
+    DDL and then insert statements to create the rows. The resulting file can then be run on any
+    other MySQL server to reproduce the analysis database.
+    """
+
+    def __init__(self, path):
+        """
+        :param path: the Path where the dump should be written
+        """
+        super().__init__()
+        self.path = path
+
+    @property
+    def message(self):
+        return 'Generates a dump of the analysis database using mysqldump'
+
+    @staticmethod
+    def serialise(value):
+        """
+        Helper function which defines how we dump certain data types for the SQL insert statements.
+        Currently this handles booleans, nulls, strings, datetimes and numbers.
+
+        :param value: a database value
+        :return: the value ready for inclusion in the insert statement
+        """
+        # booleans are dumped using the TRUE or FALSE MySQL keywords
+        if isinstance(value, bool):
+            return 'TRUE' if value else 'FALSE'
+
+        # Nones need to be nulls
+        if value is None:
+            return 'null'
+
+        if isinstance(value, (str, datetime)):
+            # strings and datetimes need to have single quotes escaped and then the whole string
+            # must be wrapped in single quotes
+            formatted = str(value).replace("'", r"\'")
+            return f"'{formatted}'"
+
+        # numbers are fine, just wrap as a str
+        if isinstance(value, Number):
+            return str(value)
+
+        # we could do return str(value) here but to avoid subtle errors in the future it makes more
+        # sense to error if the value is of a type we don't have an explicit mapping for, therefore
+        # error
+        raise Exception(f'No serialisation mapping exists for {value} of type {type(value)}')
+
+    def run(self, context, target, *args, **kwargs):
+        with open(self.path, 'w') as f:
+            # first generate all the create DDL statements
+            for table in analysis.Base.metadata.sorted_tables:
+                f.write(f'# create for {table.name}\n')
+                f.write(f'{str(CreateTable(table).compile(target.bind)).strip()}\n')
+                f.write('\n')
+
+            f.write('\n')
+
+            # then dump the actual data
+            for table in analysis.Base.metadata.sorted_tables:
+                f.write(f'# data for {table.name}\n')
+                for row in target.query(table):
+                    values = ', '.join(map(self.serialise, row))
+                    f.write(f'INSERT INTO {table.name} VALUES ({values});\n')
+                f.write('\n')
 
 
 class ClearAnalysisDB(Step):

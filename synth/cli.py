@@ -4,7 +4,7 @@ import click
 import click_pathlib
 import yaml
 
-from synth.etl import etl_steps, GenerateSynthDatabaseModel
+from synth.etl import etl_steps, GenerateSynthDatabaseModel, DumpAnalysisDatabase
 from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
 from synth.utils import Context, Config, UpdateOutputStep
 
@@ -105,10 +105,23 @@ def outputs(context, names):
     context.run_steps(steps)
 
 
+@synth.command()
+@click.option('-f', '--filename', default=lambda: get_here().parent / 'analysis_db.sql',
+              help='output filename', show_default='analysis_db.sql', type=click_pathlib.Path())
+@click.pass_obj
+def dump(context, filename):
+    """
+    Dumps the current analysis database's contents out into an SQL file (given by the filename
+    option). The DDL to create the database's tables is output as well as the data itself.
+    """
+    context.run_steps([DumpAnalysisDatabase(filename)])
+
+
 if __name__ == '__main__':
     # for dev!
     # generate(obj=setup(get_here().parent / 'config.yml'))
     # rebuild(obj=setup(get_here().parent / 'config.yml'))
     # update(obj=setup(get_here().parent / 'config.yml'))
-    outputs(obj=setup(get_here().parent / 'config.yml'))
+    # outputs(obj=setup(get_here().parent / 'config.yml'))
+    # dump(obj=setup(get_here().parent / 'config.yml'))
     pass
