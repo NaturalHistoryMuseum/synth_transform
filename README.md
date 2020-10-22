@@ -138,6 +138,16 @@ It is possible to specify which outputs to update using the `--name` option whic
 multiple times to only update a set of names.
 
 
+#### `dump`
+```bash
+synth dump
+synth outputs --filename <filename>
+```
+
+Dumps the current analysis database to an SQL file.
+The file includes table creation DDL and then data insert statements.
+
+
 ## Supplementary Data
 In the `data` directory there are some supplementary files which are listed below along with their
 source.
