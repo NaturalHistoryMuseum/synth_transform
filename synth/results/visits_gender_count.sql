@@ -1,6 +1,6 @@
 select
     r.name    `synth round`,
-    vp.gender `age range`,
+    vp.gender `gender`,
     count(*)  `count`
 from VisitorProject vp
     join `Call` c on vp.call_submitted = c.id
