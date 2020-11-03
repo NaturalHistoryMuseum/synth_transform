@@ -6,7 +6,7 @@ import yaml
 
 from synth.etl import etl_steps, GenerateSynthDatabaseModel, DumpAnalysisDatabase
 from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
-from synth.results import UpdateResultStep, UpdateAgeRangeChartStep, CSVChartStep
+from synth.results import UpdateResultStep, CSVChartStep
 from synth.utils import Context, Config
 
 
@@ -138,6 +138,6 @@ if __name__ == '__main__':
     # generate(obj=setup(get_here().parent / 'config.yml'))
     # rebuild(obj=setup(get_here().parent / 'config.yml'))
     # update(obj=setup(get_here().parent / 'config.yml'))
-    results(obj=setup(get_here().parent / 'config.yml'))
+    # results(obj=setup(get_here().parent / 'config.yml'))
     # dump(obj=setup(get_here().parent / 'config.yml'))
     pass
