@@ -78,7 +78,7 @@ class CSVChartStep(Step, abc.ABC):
         pass
 
 
-class UpdateAgeRangeChartStep(CSVChartStep):
+class UpdateVisitsAgeRangeChartStep(CSVChartStep):
     """
     Creates a chart for the visits_age_range_count.csv results file.
     """
