@@ -6,7 +6,8 @@ import yaml
 
 from synth.etl import etl_steps, GenerateSynthDatabaseModel, DumpAnalysisDatabase
 from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
-from synth.utils import Context, Config, UpdateOutputStep
+from synth.results import UpdateResultStep
+from synth.utils import Context, Config
 
 
 def get_here():
@@ -94,13 +95,13 @@ def update(context, names):
 @click.option('-n', '--name', 'names', help='The name of the sql file to run', type=str,
               multiple=True)
 @click.pass_obj
-def outputs(context, names):
+def results(context, names):
     """
-    Updates the csv files in the outputs folder by running the sql associated with each against the
-    analysis database. If no names are provided then all output are updated.
+    Updates the csv files in the results folder by running the sql associated with each against the
+    analysis database. If no names are provided then all results are updated.
     """
-    outputs_path = get_here() / 'outputs'
-    steps = [UpdateOutputStep(sql_file) for sql_file in outputs_path.glob('**/*.sql')
+    results_path = get_here() / 'results'
+    steps = [UpdateResultStep(sql_file) for sql_file in results_path.glob('**/*.sql')
              if not names or sql_file.stem in names]
     context.run_steps(steps)
 
