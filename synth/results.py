@@ -115,3 +115,23 @@ class UpdateVisitsCountChartStep(CSVChartStep):
         g.set_axis_labels("Synth round", "Visit count")
 
         return g
+
+
+class UpdateVisitsGenderChartStep(CSVChartStep):
+    """
+    Creates a chart for the visits_gender_count.csv results file.
+    """
+
+    @property
+    def csv_file(self):
+        return self.results_path / 'visits_gender_count.csv'
+
+    def create_chart(self, data):
+        sns.set_theme(style='whitegrid')
+        g = sns.catplot(data=data, kind='bar', x='synth round', y='count', hue='gender', ci=None,
+                        palette='dark', alpha=.6, height=6)
+        g.despine(left=True)
+        g.set_axis_labels("", "Visit count")
+        g.legend.set_title("")
+
+        return g
