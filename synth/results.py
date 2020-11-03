@@ -1,10 +1,11 @@
 import abc
 import csv
+import shutil
 from pathlib import Path
 
 import pandas as pd
 
-from synth.utils import Step
+from synth.utils import Step, SynthRound
 
 import seaborn as sns
 
@@ -62,20 +63,13 @@ class CSVChartStep(Step, abc.ABC):
     def message(self):
         return f'Updating {self.csv_file.stem} chart'
 
-    def run(self, context, target, *args, **kwargs):
-        data = pd.read_csv(self.csv_file)
-        chart = self.create_chart(data)
-        chart.savefig(self.results_path / f'{self.csv_file.stem}.png')
+    def load(self):
+        return pd.read_csv(self.csv_file)
 
-    @abc.abstractmethod
-    def create_chart(self, data):
-        """
-        Abstract method that should return a chart (Grid) generated from the given data.
-
-        :param data: a pandas dataframe of the CSV file
-        :return: a Grid object
-        """
-        pass
+    def save(self, chart, path=None):
+        if path is None:
+            path = self.results_path / f'{self.csv_file.stem}.png'
+        chart.savefig(path)
 
 
 class UpdateVisitsAgeRangeChartStep(CSVChartStep):
@@ -87,15 +81,15 @@ class UpdateVisitsAgeRangeChartStep(CSVChartStep):
     def csv_file(self):
         return self.results_path / 'visits_age_range_count.csv'
 
-    def create_chart(self, data):
+    def run(self, context, target, *args, **kwargs):
         sns.set_theme(style='whitegrid')
-        g = sns.catplot(data=data, kind='bar', x='age range', y='count', hue='synth round', ci=None,
-                        palette='dark', alpha=.6, height=6)
+        g = sns.catplot(data=self.load(), kind='bar', x='age range', y='count', hue='synth round',
+                        ci=None, palette='dark', alpha=.6, height=6)
         g.despine(left=True)
         g.set_axis_labels("Age range", "Visit count")
         g.legend.set_title("")
 
-        return g
+        self.save(g)
 
 
 class UpdateVisitsCountChartStep(CSVChartStep):
@@ -107,14 +101,14 @@ class UpdateVisitsCountChartStep(CSVChartStep):
     def csv_file(self):
         return self.results_path / 'visits_count.csv'
 
-    def create_chart(self, data):
+    def run(self, context, target, *args, **kwargs):
         sns.set_theme(style='whitegrid')
-        g = sns.catplot(data=data, kind='bar', x='synth round', y='count', ci=None, palette='dark',
-                        alpha=.6, height=6)
+        g = sns.catplot(data=self.load(), kind='bar', x='synth round', y='count', ci=None,
+                        palette='dark', alpha=.6, height=6)
         g.despine(left=True)
         g.set_axis_labels("Synth round", "Visit count")
 
-        return g
+        self.save(g)
 
 
 class UpdateVisitsGenderChartStep(CSVChartStep):
@@ -126,12 +120,44 @@ class UpdateVisitsGenderChartStep(CSVChartStep):
     def csv_file(self):
         return self.results_path / 'visits_gender_count.csv'
 
-    def create_chart(self, data):
+    def run(self, context, target, *args, **kwargs):
         sns.set_theme(style='whitegrid')
-        g = sns.catplot(data=data, kind='bar', x='synth round', y='count', hue='gender', ci=None,
+        g = sns.catplot(data=self.load(), kind='bar', x='synth round', y='count', hue='gender', ci=None,
                         palette='dark', alpha=.6, height=6)
         g.despine(left=True)
         g.set_axis_labels("", "Visit count")
         g.legend.set_title("")
 
-        return g
+        self.save(g)
+
+
+class UpdateVisitorNationalityCountStep(CSVChartStep):
+    """
+    Creates charts for the visits_visitor_nationality_count.csv results file.
+    """
+
+    @property
+    def csv_file(self):
+        return self.results_path / 'visits_visitor_nationality_count.csv'
+
+    def run(self, context, target, *args, **kwargs):
+        data = self.load()
+
+        # TODO: this chart is silly
+        sns.set_theme(style='whitegrid')
+        g = sns.catplot(data=data, kind='bar', x='synth round', y='count',
+                        hue='visitor nationality country code', ci=None, palette='dark', alpha=.6,
+                        height=6)
+        g.despine(left=True)
+        g.set_axis_labels("", "Visit count")
+        g.legend.set_title("Country code")
+        self.save(g)
+
+        for synth_round in SynthRound:
+            subset = data.loc[data['synth round'] == f'Synthesys {synth_round}']
+            g = sns.catplot(data=subset, kind='bar', y='visitor nationality country code',
+                            x='count', ci=None, palette='dark', alpha=.6, orient='h', height=8)
+            g.despine(left=True)
+            g.set_axis_labels("Visit count", "Country code")
+            filename = f'visits_visitor_nationality_count_synth_{synth_round}.png'
+            self.save(g, path=self.results_path / filename)
