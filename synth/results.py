@@ -20,9 +20,16 @@ class UpdateResultStep(Step):
         return f'Updating {self.sql_file.stem} output'
 
     def run(self, context, target, *args, **kwargs):
-        with self.sql_file.open('rt') as f, self.csv_file.open('w') as g:
-            # set the lineterminator for consistency across platforms
-            writer = csv.writer(g, lineterminator='\n')
+        with self.sql_file.open('rt') as f:
+            # grab the results from the database
             result = target.execute(f.read())
-            writer.writerow(result.keys())
-            writer.writerows(result.fetchall())
+            headers = result.keys()
+            rows = result.fetchall()
+
+            # now open the csv file and write the data we've got in memory, this avoids overwriting
+            # the csv file with a partial result in the event of a database error
+            with self.csv_file.open('w') as g:
+                # set the lineterminator for consistency across platforms
+                writer = csv.writer(g, lineterminator='\n')
+                writer.writerow(headers)
+                writer.writerows(rows)
