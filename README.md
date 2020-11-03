@@ -126,22 +126,22 @@ The names of the resources are listed below in the [_Supplementary Data_](#suppl
 section.
 
 
-#### `outputs`
+#### `results`
 ```bash
-synth outputs
-synth outputs --name <name>
-synth outputs --name <name> --name <name> ...
+synth results
+synth results --name <name>
+synth results --name <name> --name <name> ...
 ```
 
-Updates the outputs data.
-It is possible to specify which outputs to update using the `--name` option which can be specified
+Updates the results data.
+It is possible to specify which results to update using the `--name` option which can be specified
 multiple times to only update a set of names.
 
 
 #### `dump`
 ```bash
 synth dump
-synth outputs --filename <filename>
+synth dump --filename <filename>
 ```
 
 Dumps the current analysis database to an SQL file.
