@@ -96,3 +96,22 @@ class UpdateVisitsAgeRangeChartStep(CSVChartStep):
         g.legend.set_title("")
 
         return g
+
+
+class UpdateVisitsCountChartStep(CSVChartStep):
+    """
+    Creates a chart for the visits_count.csv results file.
+    """
+
+    @property
+    def csv_file(self):
+        return self.results_path / 'visits_count.csv'
+
+    def create_chart(self, data):
+        sns.set_theme(style='whitegrid')
+        g = sns.catplot(data=data, kind='bar', x='synth round', y='count', ci=None, palette='dark',
+                        alpha=.6, height=6)
+        g.despine(left=True)
+        g.set_axis_labels("Synth round", "Visit count")
+
+        return g
