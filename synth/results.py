@@ -1,13 +1,10 @@
 import abc
 import csv
-import shutil
-from pathlib import Path
 
 import pandas as pd
+import seaborn as sns
 
 from synth.utils import Step, SynthRound
-
-import seaborn as sns
 
 
 class UpdateResultStep(Step):
@@ -122,7 +119,8 @@ class UpdateVisitsGenderChartStep(CSVChartStep):
 
     def run(self, context, target, *args, **kwargs):
         sns.set_theme(style='whitegrid')
-        g = sns.catplot(data=self.load(), kind='bar', x='synth round', y='count', hue='gender', ci=None,
+        g = sns.catplot(data=self.load(), kind='bar', x='synth round', y='count', hue='gender',
+                        ci=None,
                         palette='dark', alpha=.6, height=6)
         g.despine(left=True)
         g.set_axis_labels("", "Visit count")
