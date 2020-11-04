@@ -140,4 +140,4 @@ if __name__ == '__main__':
     # update(obj=setup(get_here().parent / 'config.yml'))
     # results(obj=setup(get_here().parent / 'config.yml'))
     # dump(obj=setup(get_here().parent / 'config.yml'))
-    pass
+    synth()

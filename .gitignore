@@ -4,3 +4,9 @@ venv
 synth.egg-info
 __pycache__
 analysis_db.sql
+
+docker-compose.yml
+
+notebooks/.ipynb_checkpoints/
+
+notebooks/mappings.json

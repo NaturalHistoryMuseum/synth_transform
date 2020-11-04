@@ -15,7 +15,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, find_doi, clean_authors, to_datetime
+from synth.utils import Step, SynthRound, clean_string, to_datetime
 
 
 def etl_steps(with_data=True):
@@ -383,9 +383,15 @@ class CleanOutputsTable(Step):
             if 'given' in author and 'family' in author:
                 authors.append(f"{author['family']} {author['given']}")
 
+        titles = doi_metadata['title']
+        if len(titles) == 0:
+            title = output.title
+        else:
+            title = clean_string(titles[0])
+
         output.authors = '; '.join(authors)
         output.year = int(doi_metadata['created']['date-time'][:4])
-        output.title = doi_metadata['title'][0]
+        output.title = title
         output.publisher = doi_metadata['publisher']
         output.url = doi_metadata['URL']
         if 'volume' in doi_metadata:
@@ -398,26 +404,32 @@ class CleanOutputsTable(Step):
         Clean up the outputs table in the target database by attempting to match the entries in the
         table to papers in Crossref's API.
         """
+        doi_cache = context.resources[Resource.DOIS]
+        metadata_cache = context.resources[Resource.DOIMETADATA]
         handled = set()
-
-        # look for DOIs first cause they should be able to provide us with nice clean metadata
-        def _search_column(colname):
-            for output in target.query(Output).filter(
-                    or_(getattr(Output, colname).ilike('%doi%'), getattr(Output, colname).ilike('%10.%/%'))):
-                doi = find_doi(getattr(output, colname))
-                doi_metadata = context.resources[Resource.DOIS].get(doi, None)
-                if doi_metadata:
-                    self.update_output_from_doi_metadata(output, doi_metadata)
-                    handled.add(output.id)
-
-        _search_column('url')
-        _search_column('volume')
-        _search_column('pages')
+        added = set()
 
         # attempt to clean up the authors to make it easier to search for them later
-        for output in target.query(Output).filter(Output.id.notin_(handled), Output.authors.isnot(None),
+        for output in target.query(Output).filter(Output.authors.isnot(None),
                                                   Output.authors != ''):
-            output.authors = clean_authors(output.authors)
+            output.authors = clean_string(output.authors)
+
+        # clean the titles as well
+        for output in target.query(Output).filter(Output.title.isnot(None),
+                                                  Output.title != ''):
+            output.title = clean_string(output.title)
+
+        # update from the cached matched DOIs and metadata (recommended that the update methods are run before this)
+        with doi_cache, metadata_cache:
+            mapped_items = doi_cache.mapped_items(context.mappings[NHMOutput])
+            for output in target.query(Output).filter(Output.id.in_(mapped_items.keys())):
+                handled.add(output.id)
+                doi = mapped_items.get(output.id)
+                if doi is not None:
+                    doi_metadata = metadata_cache.get(doi)
+                    if doi_metadata:
+                        self.update_output_from_doi_metadata(output, doi_metadata)
+                        added.add(output.id)
 
 
 class FillVisitorProjectTable(Step):

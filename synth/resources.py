@@ -2,20 +2,29 @@ import abc
 import csv
 import enum
 import json
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import click
 import requests
-from crossref.restful import Works
+from crossref.restful import Works, Etiquette
+from fuzzywuzzy import fuzz
+from sqlalchemy import or_
+from sqlitedict import SqliteDict
+from tqdm.contrib.concurrent import thread_map
 
 from synth.errors import DuplicateUserGUIDError
 from synth.model.rco_synthsys_live import NHMOutput
-from synth.utils import Step, find_doi, SynthRound
+from synth.parsers.doi import DOIExtractor
+from synth.utils import Step, SynthRound, find_names, clean_string
 
 
 @enum.unique
 class Resource(enum.Enum):
     INSTITUTIONS = 'institutions'
     DOIS = 'dois'
+    DOIMETADATA = 'doimetadata'
     USERS = 'users'
 
 
@@ -48,6 +57,9 @@ class DataResource(abc.ABC):
 
 
 class JSONDataResource(DataResource, abc.ABC):
+    """
+    Class representing a data resource in JSON format.
+    """
 
     def __init__(self, context, path):
         super().__init__(context)
@@ -68,6 +80,53 @@ class JSONDataResource(DataResource, abc.ABC):
         return self.data.get(key, default)
 
 
+class SqliteDataResource(DataResource, abc.ABC):
+    """
+    Class representing a data resource in SQLiteDict format (.db file, key-value store).
+    """
+
+    def __init__(self, context, path):
+        super().__init__(context)
+        self.path = path
+        self.data = None
+
+    @property
+    def keys(self):
+        return list(self.data.keys())
+
+    def load(self, *args, **kwargs):
+        """
+        Use 'with x:' syntax instead to prevent resource being left open.
+        """
+        pass
+
+    def update(self, *args, **kwargs):
+        """
+        Clear the resource, ready for new data.
+        """
+        if self.data is None:
+            raise Exception('Resource is not open.')
+        self.data.clear()
+
+    def get(self, key, default=None):
+        if self.data is None:
+            raise Exception('Resource is not open.')
+        return self.data.get(key, default)
+
+    def add(self, key, value):
+        if self.data is None:
+            raise Exception('Resource is not open.')
+        self.data[key] = value
+
+    def __enter__(self):
+        self.data = SqliteDict(str(self.path))
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.data.commit()
+        self.data.close()
+        self.data = None
+
+
 class Institutions(JSONDataResource):
     """
     Cleaned up aliases for institution names from the Vizzuality synth 3 GitHub repo.
@@ -85,31 +144,202 @@ class Institutions(JSONDataResource):
         super().update()
 
 
-class OutputDOIs(JSONDataResource):
+class DOIMetadata(SqliteDataResource):
     """
-    This resource is a cached set of DOI metadata pulled from Crossref's API for the DOIs present in
-    the source synth databases. Having this cached speeds up the ETL processing and reduces our
-    calls to the Crossref API which is the nice thing to do.
-
-    Note that updating the cache can take about ~20 mins or so.
+    This resource is a cached set of DOI metadata pulled from Crossref's API for the DOIs saved in the OutputDOIs
+    resource. Having this cached speeds up the ETL processing and reduces our calls to the Crossref API which is the
+    nice thing to do.
     """
 
     def __init__(self, context):
-        super().__init__(context, DataResource.data_dir / 'output_dois.json')
-        self.works = Works()
+        super().__init__(context, DataResource.data_dir / 'doi_metadata.db')
+        etiquette = Etiquette('SYNTH transform', '0.1', 'https://github.com/NaturalHistoryMuseum/synth_transform',
+                              'data@nhm.ac.uk')
+        self.works = Works(etiquette=etiquette)
+        self._handled = set()  # all the dois that are checked in this run
+        self._added = set()  # all the dois that are added in this run
+        self._errors = {}
+
+    def _get_metadata(self, conn, doi):
+        """
+        Retrieve metadata for a single DOI and add it to a SqliteDataResource with an open SQLiteDict.
+        :param conn: SqliteDataResource with an open SQLiteDict, e.g. 'self' within 'with self:'
+        :param doi: the DOI to search crossref for
+        """
+        if doi is None:
+            return
+        self._handled.add(doi)
+        try:
+            doi_metadata = self.works.doi(doi)
+            if doi_metadata:
+                conn.add(doi_metadata['DOI'].upper(), doi_metadata)
+                self._added.add(doi)
+        except Exception as e:
+            self._errors[doi] = e
 
     def update(self, context, target, *synth_sources):
-        self.data = {}
-        for synth_db in synth_sources:
-            for output in synth_db.query(NHMOutput).filter(NHMOutput.URL.ilike('%doi%')):
-                doi = find_doi(output.URL)
-                if doi:
+        """
+        Retrieve and store metadata for each the DOIs stored in the OutputDOIs resource.
+        """
+        with self:
+            super(DOIMetadata, self).update(context, target, *synth_sources)
+        self._handled = set()
+        self._added = set()
+        self._errors = {}
+
+        doi_cache = OutputDOIs(context)
+        with doi_cache:
+            found_dois = list(set(doi_cache.data.values()))
+
+        workers = context.config.resource_opt('doimetadata.threads', 20)
+        with self, ThreadPoolExecutor(workers) as executor:
+            thread_map(lambda x: self._get_metadata(self, x), found_dois, desc='Crossref', unit=' dois', leave=False,
+                       position=1)
+
+
+class OutputDOIs(SqliteDataResource):
+    """
+    This resource is a cached set of output IDs matched to DOIs using regexes, URLs, Crossref searches, and Refindit
+    searches. This resource takes several hours to update, depending on throttling from Crossref and number of threads
+    available for multiprocessing.
+    """
+
+    def __init__(self, context):
+        super().__init__(context, DataResource.data_dir / 'output_dois.db')
+        etiquette = Etiquette('SYNTH transform', '0.1', 'https://github.com/NaturalHistoryMuseum/synth_transform',
+                              'data@nhm.ac.uk')
+        self.works = Works(etiquette=etiquette)
+        self._handled = set()
+        self._added = set()
+        self._errors = {}
+        self._methods = {}
+
+    @property
+    def keys(self):
+        return [tuple(json.loads(k)) for k in self.data.keys()]
+
+    def mapped_items(self, new_id_map):
+        """
+        Transform the stored keys (tuples of (synth round, output ID)) into new IDs using a map generated during the
+        rebuild process. Resource must be open.
+        :param new_id_map: a dict with tuple keys and new ID values
+        """
+        if self.data is None:
+            raise Exception('Resource is not open.')
+        mapped = {}
+        for k, v in self.data.items():
+            try:
+                new_key = new_id_map[tuple(json.loads(k))]
+                mapped[new_key] = v
+            except KeyError:
+                continue
+        return mapped
+
+    def _search_output(self, conn, output, synth_round):
+        """
+        Search for a single output using title and author. Searches the Crossref API first, then ReFindIt if that
+        doesn't return a suitable result. Compares the output title with each result using fuzzywuzzy and considers
+        them a match if the two strings are at least 80% similar.
+        :param conn: SqliteDataResource with an open SQLiteDict, e.g. 'self' within 'with self:'
+        :param output: the Output instance we're attempting to find a DOI for
+        :param synth_round: the round this output was recorded in
+        """
+        output_key = json.dumps((synth_round, output.Output_ID))
+        self._handled.add(output_key)
+        try:
+            authors = find_names(clean_string(output.Authors) or '')
+            title = output.Title.rstrip('.')
+            q = self.works.query(author=authors, bibliographic=title).sort('relevance').order('desc')
+            for ri, result in enumerate(q):
+                result_title = result.get('title', [None])[0]
+                if result_title is None:
+                    continue
+                similarity = fuzz.partial_ratio(result_title, title.lower())
+                if similarity >= 80:
+                    self._added.add(output.Output_ID)
+                    conn.add(output_key, result['DOI'].upper())
+                    self._methods[output_key] = 'crossref'
+                    return
+                if ri >= 3 - 1:
+                    return
+            # refindit also searches a few other databases, so try that if crossref doesn't find it
+            refindit_url = 'https://refinder.org/find?search=advanced&limit=5&title=' \
+                           f'{title}&author={"&author=".join(authors)}'
+            refindit_response = requests.get(refindit_url)
+            if refindit_response.ok:
+                for ri, result in enumerate(refindit_response.json()):
+                    result_title = result.get('title')
+                    if result_title is None:
+                        continue
+                    similarity = fuzz.partial_ratio(result_title, title.lower())
+                    if similarity >= 80:
+                        self._added.add(output.Output_ID)
+                        conn.add(output_key, result['DOI'].upper())
+                        self._methods[output_key] = 'refindit'
+                        return
+        except Exception as e:
+            self._errors[(synth_round, output.Output_ID)] = e
+
+    def update(self, context, target, *synth_sources):
+        """
+        Attempt to find a DOI for each output in the NHMOutput tables.
+        """
+        with self:
+            super(OutputDOIs, self).update(context, target, *synth_sources)
+        self._handled = set()
+        self._errors = {}
+        self._methods = {}
+
+        for db_ix, synth_db in enumerate(synth_sources):
+            db_ix += 1
+            self._added = set()
+
+            def _extract_doi(conn, output, col):
+                output_key = json.dumps((db_ix, output.Output_ID))
+                self._handled.add(output_key)
+                for x in DOIExtractor.dois(getattr(output, col), fix=True):
+                    doi, fn = x
                     doi_metadata = self.works.doi(doi)
                     if doi_metadata:
-                        self.data[doi_metadata['DOI']] = doi_metadata
+                        doi_title = doi_metadata.get('title', '')
+                        doi_title = clean_string(doi_title[0]).lower()
+                        output_title = output.Title
+                        if output_title is not None:
+                            output_title = clean_string(output_title.lower())
+                        match = fuzz.partial_ratio(doi_title, output_title)
+                        if match > 50:
+                            self._added.add(output.Output_ID)
+                            conn.add(output_key, doi.upper())
+                            self._methods[output_key] = fn
+                            break
 
-        # write the data dict
-        super().update()
+            def _search_columns(col, *filters):
+                outputs = synth_db.query(NHMOutput).filter(NHMOutput.Output_ID.notin_(self._added), *filters)
+                thread_workers = context.config.resource_opt('dois.threads', 20)
+                with self, ThreadPoolExecutor(thread_workers) as thread_executor:
+                    thread_map(lambda x: _extract_doi(self, x, col), outputs.all(), desc=col, unit=' records',
+                               leave=False, position=1)
+
+            _search_columns('URL', NHMOutput.URL.isnot(None))
+            _search_columns('Volume', or_(NHMOutput.Volume.ilike('%doi%'), NHMOutput.Volume.ilike('%10.%/%')))
+            _search_columns('Pages', or_(NHMOutput.Pages.ilike('%doi%'), NHMOutput.Pages.ilike('%10.%/%')))
+
+            # now for searching based on metadata
+            title_and_author = synth_db.query(NHMOutput).filter(NHMOutput.Output_ID.notin_(self._added),
+                                                                NHMOutput.Title.isnot(None),
+                                                                NHMOutput.Authors.isnot(None))
+
+            workers = context.config.resource_opt('dois.threads', 20)
+            with self, ThreadPoolExecutor(workers) as executor:
+                thread_map(lambda x: self._search_output(self, x, db_ix), title_and_author.all(), desc='Crossref',
+                           unit=' records', leave=False, position=1)
+
+        methods = {}
+        for k, v in self._methods.items():
+            methods[v] = methods.get(v, []) + [k]
+
+        for k, v in methods.items():
+            click.echo(f'{k}: {len(v)}')
 
 
 class Users(DataResource):
@@ -226,11 +456,13 @@ class RegisterResourcesStep(Step):
         return 'Registering resource data files'
 
     def run(self, context, *args, **kwargs):
-        resources = {
-            Resource.INSTITUTIONS: Institutions(context),
-            Resource.DOIS: OutputDOIs(context),
-            Resource.USERS: Users(context),
-        }
+        # use an OrderedDict because OutputDOIs should always be run before DOIMetadata
+        resources = OrderedDict((
+            (Resource.INSTITUTIONS, Institutions(context)),
+            (Resource.DOIS, OutputDOIs(context)),
+            (Resource.DOIMETADATA, DOIMetadata(context)),
+            (Resource.USERS, Users(context))
+        ))
         for resource in resources.values():
             resource.load(context, *args, **kwargs)
         context.resources.update(resources)
