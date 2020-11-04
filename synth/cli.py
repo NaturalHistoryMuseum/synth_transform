@@ -4,9 +4,10 @@ import click
 import click_pathlib
 import yaml
 
-from synth.etl import etl_steps, GenerateSynthDatabaseModel
+from synth.etl import etl_steps, GenerateSynthDatabaseModel, DumpAnalysisDatabase
 from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
-from synth.utils import Context, Config, UpdateOutputStep
+from synth.results import UpdateResultStep, CSVChartStep
+from synth.utils import Context, Config
 
 
 def get_here():
@@ -94,15 +95,42 @@ def update(context, names):
 @click.option('-n', '--name', 'names', help='The name of the sql file to run', type=str,
               multiple=True)
 @click.pass_obj
-def outputs(context, names):
+def results(context, names):
     """
-    Updates the csv files in the outputs folder by running the sql associated with each against the
-    analysis database. If no names are provided then all output are updated.
+    Updates the csvs and charts in the results folder by running the sql against the analysis
+    database, updating the CSV and then regenerating any dependant charts. If no names are provided
+    then all results are updated.
     """
-    outputs_path = get_here() / 'outputs'
-    steps = [UpdateOutputStep(sql_file) for sql_file in outputs_path.glob('**/*.sql')
-             if not names or sql_file.stem in names]
+    def is_name_allowed(name):
+        return not names or name in names
+
+    results_path = get_here() / 'results'
+    steps = []
+
+    # first, read the database and write the csvs
+    for sql_file in results_path.glob('**/*.sql'):
+        if is_name_allowed(sql_file.stem):
+            steps.append(UpdateResultStep(sql_file))
+
+    # then create any charts
+    for chart_step_class in CSVChartStep.__subclasses__():
+        chart_step = chart_step_class(results_path)
+        if is_name_allowed(chart_step.csv_file.stem):
+            steps.append(chart_step)
+
     context.run_steps(steps)
+
+
+@synth.command()
+@click.option('-f', '--filename', default=lambda: get_here().parent / 'analysis_db.sql',
+              help='output filename', show_default='analysis_db.sql', type=click_pathlib.Path())
+@click.pass_obj
+def dump(context, filename):
+    """
+    Dumps the current analysis database's contents out into an SQL file (given by the filename
+    option). The DDL to create the database's tables is output as well as the data itself.
+    """
+    context.run_steps([DumpAnalysisDatabase(filename)])
 
 
 if __name__ == '__main__':
@@ -110,4 +138,6 @@ if __name__ == '__main__':
     # generate(obj=setup(get_here().parent / 'config.yml'))
     # rebuild(obj=setup(get_here().parent / 'config.yml'))
     # update(obj=setup(get_here().parent / 'config.yml'))
+    # results(obj=setup(get_here().parent / 'config.yml'))
+    # dump(obj=setup(get_here().parent / 'config.yml'))
     synth()
