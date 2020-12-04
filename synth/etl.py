@@ -423,7 +423,8 @@ class CleanOutputsTable(Step):
                                                   Output.title != ''):
             output.title = clean_string(output.title)
 
-        # update from the cached matched DOIs and metadata (recommended that the update methods are run before this)
+        # update from the cached matched DOIs and metadata (recommended that the update methods are
+        # run before this)
         with doi_cache, metadata_cache:
             mapped_items = doi_cache.mapped_items(context.mappings[NHMOutput])
             for output in target.query(Output).filter(Output.id.in_(mapped_items.keys())):
