@@ -1,5 +1,4 @@
 import abc
-import csv
 import enum
 import re
 import warnings
@@ -9,7 +8,7 @@ from datetime import datetime
 
 import click
 from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
@@ -97,8 +96,29 @@ def to_datetime(value, date_format='%a %b %d %H:%M:%S %Z %Y'):
     """
     if not value:
         return None
-    # Wed Sep 15 10:36:54 BST 2004
     return datetime.strptime(value, date_format)
+
+
+def clean_institution(lookup, institution):
+    """
+    Given the institutions resource and an institution name, clean up the passed name and attempt
+    to match it to the lookup in case we have a cleaner version.
+
+    If no cleaner version exists in the lookup then the name (with html bits removed) is returned.
+
+    :param lookup: the data of Institutions resource (should be a dict)
+    :param institution: the candidate institution name
+    :return: the cleaned version of the name
+    """
+    if institution is None:
+        return None
+
+    institution = clean_string(institution)
+    if institution in lookup:
+        match = lookup[institution]
+        return None if match == 'nil' else match
+
+    return institution
 
 
 @contextmanager

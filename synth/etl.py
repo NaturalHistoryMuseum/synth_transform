@@ -4,7 +4,7 @@ from datetime import datetime
 from numbers import Number
 
 import pycountry
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import create_engine, func
 from sqlalchemy.schema import CreateTable
 from sqlalchemy_utils import create_database, database_exists
 
@@ -15,7 +15,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, clean_string, to_datetime
+from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution
 
 
 def etl_steps(with_data=True):
@@ -454,6 +454,7 @@ class FillVisitorProjectTable(Step):
         :return:
         """
         users = context.resources[Resource.USERS]
+        institution_lookup = context.resources[Resource.INSTITUTIONS].data
         id_generator = itertools.count(1)
 
         for synth_round, source in zip(SynthRound, synth_sources):
@@ -514,7 +515,8 @@ class FillVisitorProjectTable(Step):
                     previous_application=bool(project.Previous_Application),
                     training_requirement=project.Training_Requirement,
                     # TODO: should use lookup and get id for?
-                    supporter_institution=project.Supporter_Institution,
+                    supporter_institution=clean_institution(institution_lookup,
+                                                            project.Supporter_Institution),
                     administration_state=project.Administration_State,
                     group_leader=bool(project.Group_leader),
                     group_members=project.Group_Members,
@@ -523,7 +525,8 @@ class FillVisitorProjectTable(Step):
                     expectations=project.UserProject_Expectations,
                     outputs=project.UserProject_Outputs,
                     # TODO: should use lookup and get id for?
-                    group_leader_institution=project.Group_Leader_Institution,
+                    group_leader_institution=clean_institution(institution_lookup,
+                                                               project.Group_Leader_Institution),
                     visit_funded_previously=project.Visit_Funded_Previously,
 
                     ############ user based info ############
@@ -536,7 +539,8 @@ class FillVisitorProjectTable(Step):
                     researcher_discipline3=user.Discipline3,
                     home_institution_type=user.Home_Institution_Type,
                     home_institution_dept=user.Home_Institution_Dept,
-                    home_institution_name=user.Home_Institution_Name,
+                    home_institution_name=clean_institution(institution_lookup,
+                                                            user.Home_Institution_Name),
                     home_institution_town=user.Home_Institution_Town,
                     home_institution_country=context.translate(CountryIsoCode,
                                                                user.Home_Institution_Country_code,
