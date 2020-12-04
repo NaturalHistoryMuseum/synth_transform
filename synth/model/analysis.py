@@ -43,34 +43,31 @@ class Discipline(Base):
     name = Column(Text)
 
 
-class Facility(Base):
-    __tablename__ = 'Facility'
+class Category(Base):
+    __tablename__ = 'Category'
 
-    # rename to id from Category_ID
     id = Column(Integer, primary_key=True)
-    category = Column(Text)
-
-
-class Installation(Base):
-    __tablename__ = 'Installation'
-
-    # rename to id from Facility_ID
-    id = Column(Integer, primary_key=True)
-    installationShortName = Column(Text)
-    installationLongName = Column(Text)
-    installationDescription = Column(Text)
-    categoryID = Column(Integer)
+    name = Column(Text)
+    higherName = Column(Text)
 
 
 class Institution(Base):
     __tablename__ = 'Institution'
 
-    # rename to id
     id = Column(Integer, primary_key=True)
-    institutionName = Column(Text)
-    TAFID = Column(Integer)
-    countryCode = Column(Text)
-    TAFFamilyMember = Column(Boolean)
+    acronym = Column(Text)
+    name = Column(Text)
+    country_id = Column(Integer, ForeignKey(Country.id))
+
+
+class InstallationFacility(Base):
+    __tablename__ = 'InstallationFacility'
+
+    id = Column(Integer, primary_key=True)
+    code = Column(Text)
+    category_id = Column(Integer, ForeignKey(Category.id))
+    institution_id = Column(Integer, ForeignKey(Institution.id))
+    description = Column(Text)
 
 
 class Output(Base):
@@ -98,15 +95,6 @@ class SpecificDiscipline(Base):
     id = Column(Integer, primary_key=True)
     name = Column(Text)
     discipline_id = Column(Integer, ForeignKey(Discipline.id))
-
-
-class TAF(Base):
-    __tablename__ = 'TAF'
-
-    # rename: id from TAF_ID
-    id = Column(Integer, primary_key=True)
-    infrastructureShortName = Column(Text)
-    name = Column(Text)
 
 
 class VisitorProject(Base):
@@ -169,3 +157,13 @@ class VisitorProject(Base):
     # TODO: there's no data in this column in any of the synth databases, do we need it?
     travel_and_subsistence_reimbursed = Column(Text)
     job_title = Column(Text)
+
+
+class AccessRequest(Base):
+    __tablename__ = 'AccessRequest'
+
+    id = Column(Integer, primary_key=True)
+    installation_facility_id = Column(Integer, ForeignKey(InstallationFacility.id))
+    days_requested = Column(Integer)
+    request_detail = Column(Text)
+    visitor_project_id = Column(Integer, ForeignKey(VisitorProject.id))

@@ -11,7 +11,7 @@ from sqlalchemy_utils import create_database, database_exists
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output, \
-    VisitorProject
+    VisitorProject, Category, Institution, InstallationFacility, AccessRequest
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
@@ -42,6 +42,10 @@ def etl_steps(with_data=True):
             FillOutputTable,
             CleanOutputsTable,
             FillVisitorProjectTable,
+            FillCategoryTable,
+            FillInstitutionTable,
+            FillInstallationFacilityTable,
+            FillAccessRequestTable,
         )])
 
     return steps
@@ -449,6 +453,7 @@ class FillVisitorProjectTable(Step):
         :return:
         """
         users = context.resources[Resource.USERS]
+        id_generator = itertools.count(1)
 
         for synth_round, source in zip(SynthRound, synth_sources):
             # grab only the projects that have been "completed"
@@ -475,7 +480,13 @@ class FillVisitorProjectTable(Step):
                 # work out which call the project was submitted against
                 call_submitted = calls[int(project.Call_Submitted) - 1].id
 
+                visitor_project_id = next(id_generator)
+
+                context.map(TListOfUserProject, project.UserProject_ID, visitor_project_id,
+                            synth_round)
+
                 visitor_project = VisitorProject(
+                    id=visitor_project_id,
                     ############ project based info ############
                     title=project.UserProject_Title,
                     objectives=project.UserProject_Objectives,
@@ -539,3 +550,90 @@ class FillVisitorProjectTable(Step):
                 )
 
                 target.add(visitor_project)
+
+
+class FillCategoryTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Category table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the category table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].category
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(Category(id=row.Category_ID, name=row.CategoryName,
+                                higherName=row.HigherCategoryName))
+
+
+class FillInstitutionTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Institution table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the institution table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].institution
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            # lookup the country in the analysis db rather than using translate given that this code
+            # doesn't come from the database directly
+            country = target.query(Country).filter(Country.code == row.CountryCode).one()
+            target.add(Institution(id=row.Institution_ID, acronym=row.InstitutionAcronym,
+                                   name=row.InstitutionName, country_id=country.id))
+
+
+class FillInstallationFacilityTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill InstallationFacility table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the InstallationFacility table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].installation_facility
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(InstallationFacility(id=row.InstallationFacility_ID,
+                                            code=row.InstallationCode,
+                                            description=row.InstallationFacilityDescription,
+                                            category_id=row.Category_ID,
+                                            institution_id=row.Institution_ID))
+
+
+class FillAccessRequestTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill AccessRequest table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the AccessRequest table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].access_requests
+
+        for row in data.itertuples():
+            visitor_project_id = context.translate(TListOfUserProject, row.UserProject_ID,
+                                                   row.SynthRound)
+            target.add(AccessRequest(id=row.AccessRequest_ID,
+                                     visitor_project_id=visitor_project_id,
+                                     installation_facility_id=row.InstallationFacility_ID,
+                                     days_requested=row.DaysRequested,
+                                     request_detail=row.RequestDetail))
