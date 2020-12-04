@@ -112,7 +112,6 @@ class VisitorProject(Base):
     # TODO: fk
     taf_id = Column(Integer)
     home_facilities = Column(Boolean)
-    # TODO: enum?
     application_state = Column(Text)
     acceptance = Column(Boolean)
     summary = Column(Text)
@@ -127,7 +126,6 @@ class VisitorProject(Base):
     training_requirement = Column(Text)
     # TODO: fk?
     supporter_institution = Column(Text)
-    # TODO: enum?
     administration_state = Column(Text)
     group_leader = Column(Boolean)
     group_members = Column(Text)
@@ -146,6 +144,7 @@ class VisitorProject(Base):
     researcher_discipline3 = Column(Integer, ForeignKey(Discipline.id))
     home_institution_type = Column(Text)
     home_institution_dept = Column(Text)
+    # TODO: fk?
     home_institution_name = Column(Text)
     home_institution_town = Column(Text)
     home_institution_country = Column(Integer, ForeignKey(Country.id))
