@@ -25,7 +25,8 @@ setup(
         'sqlitedict~=1.7.0',
         'unidecode~=1.1.1',
         'untangle~=1.1.1',
-        'tqdm~=4.50.0'
+        'tqdm~=4.50.0',
+        'xlrd~=1.2.0',
     ],
     entry_points='''
         [console_scripts]

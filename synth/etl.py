@@ -4,18 +4,18 @@ from datetime import datetime
 from numbers import Number
 
 import pycountry
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import create_engine, func
 from sqlalchemy.schema import CreateTable
 from sqlalchemy_utils import create_database, database_exists
 
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output, \
-    VisitorProject
+    VisitorProject, Category, Institution, InstallationFacility, AccessRequest
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, clean_string, to_datetime
+from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution
 
 
 def etl_steps(with_data=True):
@@ -42,6 +42,11 @@ def etl_steps(with_data=True):
             FillOutputTable,
             CleanOutputsTable,
             FillVisitorProjectTable,
+            FillCategoryTable,
+            FillInstitutionTable,
+            FillInstallationFacilityTable,
+            FillAccessRequestTable,
+            CreateProjectAccessRequestsView,
         )])
 
     return steps
@@ -419,7 +424,8 @@ class CleanOutputsTable(Step):
                                                   Output.title != ''):
             output.title = clean_string(output.title)
 
-        # update from the cached matched DOIs and metadata (recommended that the update methods are run before this)
+        # update from the cached matched DOIs and metadata (recommended that the update methods are
+        # run before this)
         with doi_cache, metadata_cache:
             mapped_items = doi_cache.mapped_items(context.mappings[NHMOutput])
             for output in target.query(Output).filter(Output.id.in_(mapped_items.keys())):
@@ -449,6 +455,8 @@ class FillVisitorProjectTable(Step):
         :return:
         """
         users = context.resources[Resource.USERS]
+        institution_lookup = context.resources[Resource.INSTITUTIONS].data
+        id_generator = itertools.count(1)
 
         for synth_round, source in zip(SynthRound, synth_sources):
             # grab only the projects that have been "completed"
@@ -475,7 +483,13 @@ class FillVisitorProjectTable(Step):
                 # work out which call the project was submitted against
                 call_submitted = calls[int(project.Call_Submitted) - 1].id
 
+                visitor_project_id = next(id_generator)
+
+                context.map(TListOfUserProject, project.UserProject_ID, visitor_project_id,
+                            synth_round)
+
                 visitor_project = VisitorProject(
+                    id=visitor_project_id,
                     ############ project based info ############
                     title=project.UserProject_Title,
                     objectives=project.UserProject_Objectives,
@@ -502,7 +516,8 @@ class FillVisitorProjectTable(Step):
                     previous_application=bool(project.Previous_Application),
                     training_requirement=project.Training_Requirement,
                     # TODO: should use lookup and get id for?
-                    supporter_institution=project.Supporter_Institution,
+                    supporter_institution=clean_institution(institution_lookup,
+                                                            project.Supporter_Institution),
                     administration_state=project.Administration_State,
                     group_leader=bool(project.Group_leader),
                     group_members=project.Group_Members,
@@ -511,7 +526,8 @@ class FillVisitorProjectTable(Step):
                     expectations=project.UserProject_Expectations,
                     outputs=project.UserProject_Outputs,
                     # TODO: should use lookup and get id for?
-                    group_leader_institution=project.Group_Leader_Institution,
+                    group_leader_institution=clean_institution(institution_lookup,
+                                                               project.Group_Leader_Institution),
                     visit_funded_previously=project.Visit_Funded_Previously,
 
                     ############ user based info ############
@@ -524,7 +540,8 @@ class FillVisitorProjectTable(Step):
                     researcher_discipline3=user.Discipline3,
                     home_institution_type=user.Home_Institution_Type,
                     home_institution_dept=user.Home_Institution_Dept,
-                    home_institution_name=user.Home_Institution_Name,
+                    home_institution_name=clean_institution(institution_lookup,
+                                                            user.Home_Institution_Name),
                     home_institution_town=user.Home_Institution_Town,
                     home_institution_country=context.translate(CountryIsoCode,
                                                                user.Home_Institution_Country_code,
@@ -539,3 +556,113 @@ class FillVisitorProjectTable(Step):
                 )
 
                 target.add(visitor_project)
+
+
+class FillCategoryTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Category table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the category table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].category
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(Category(id=row.Category_ID, name=row.CategoryName,
+                                higherName=row.HigherCategoryName))
+
+
+class FillInstitutionTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Institution table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the institution table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].institution
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            # lookup the country in the analysis db rather than using translate given that this code
+            # doesn't come from the database directly
+            country = target.query(Country).filter(Country.code == row.CountryCode).one()
+            target.add(Institution(id=row.Institution_ID, acronym=row.InstitutionAcronym,
+                                   name=row.InstitutionName, country_id=country.id))
+
+
+class FillInstallationFacilityTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill InstallationFacility table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the InstallationFacility table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].installation_facility
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(InstallationFacility(id=row.InstallationFacility_ID,
+                                            code=row.InstallationCode,
+                                            description=row.InstallationFacilityDescription,
+                                            category_id=row.Category_ID,
+                                            institution_id=row.Institution_ID))
+
+
+class FillAccessRequestTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill AccessRequest table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the AccessRequest table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].access_requests
+
+        for row in data.itertuples():
+            visitor_project_id = context.translate(TListOfUserProject, row.UserProject_ID,
+                                                   row.SynthRound)
+            target.add(AccessRequest(id=row.AccessRequest_ID,
+                                     visitor_project_id=visitor_project_id,
+                                     installation_facility_id=row.InstallationFacility_ID,
+                                     days_requested=row.DaysRequested,
+                                     request_detail=row.RequestDetail))
+
+
+class CreateProjectAccessRequestsView(Step):
+
+    @property
+    def message(self):
+        return 'Create vw_project_access_requests view'
+
+    def run(self, context, target, *synth_sources):
+        '''
+        Create the vw_project_access_requests view in the target database.
+        '''
+        sql = '''
+        create view vw_project_access_requests as
+            select ar.visitor_project_id                        as visitor_project_id,
+                   count(distinct ar.id)                        as sub_installation_requests,
+                   sum(ar.days_requested)                       as project_days_requested,
+                   if((count(distinct ar.id) = 1), false, true) as multi_access_flag
+            from (AccessRequest ar
+                     left join VisitorProject vp on ((ar.visitor_project_id = vp.id)))
+            group by ar.visitor_project_id;
+        '''
+        target.execute(sql)

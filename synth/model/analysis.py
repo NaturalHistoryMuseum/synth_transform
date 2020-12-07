@@ -43,34 +43,31 @@ class Discipline(Base):
     name = Column(Text)
 
 
-class Facility(Base):
-    __tablename__ = 'Facility'
+class Category(Base):
+    __tablename__ = 'Category'
 
-    # rename to id from Category_ID
     id = Column(Integer, primary_key=True)
-    category = Column(Text)
-
-
-class Installation(Base):
-    __tablename__ = 'Installation'
-
-    # rename to id from Facility_ID
-    id = Column(Integer, primary_key=True)
-    installationShortName = Column(Text)
-    installationLongName = Column(Text)
-    installationDescription = Column(Text)
-    categoryID = Column(Integer)
+    name = Column(Text)
+    higherName = Column(Text)
 
 
 class Institution(Base):
     __tablename__ = 'Institution'
 
-    # rename to id
     id = Column(Integer, primary_key=True)
-    institutionName = Column(Text)
-    TAFID = Column(Integer)
-    countryCode = Column(Text)
-    TAFFamilyMember = Column(Boolean)
+    acronym = Column(Text)
+    name = Column(Text)
+    country_id = Column(Integer, ForeignKey(Country.id))
+
+
+class InstallationFacility(Base):
+    __tablename__ = 'InstallationFacility'
+
+    id = Column(Integer, primary_key=True)
+    code = Column(Text)
+    category_id = Column(Integer, ForeignKey(Category.id))
+    institution_id = Column(Integer, ForeignKey(Institution.id))
+    description = Column(Text)
 
 
 class Output(Base):
@@ -100,15 +97,6 @@ class SpecificDiscipline(Base):
     discipline_id = Column(Integer, ForeignKey(Discipline.id))
 
 
-class TAF(Base):
-    __tablename__ = 'TAF'
-
-    # rename: id from TAF_ID
-    id = Column(Integer, primary_key=True)
-    infrastructureShortName = Column(Text)
-    name = Column(Text)
-
-
 class VisitorProject(Base):
     __tablename__ = 'VisitorProject'
 
@@ -124,7 +112,6 @@ class VisitorProject(Base):
     # TODO: fk
     taf_id = Column(Integer)
     home_facilities = Column(Boolean)
-    # TODO: enum?
     application_state = Column(Text)
     acceptance = Column(Boolean)
     summary = Column(Text)
@@ -139,7 +126,6 @@ class VisitorProject(Base):
     training_requirement = Column(Text)
     # TODO: fk?
     supporter_institution = Column(Text)
-    # TODO: enum?
     administration_state = Column(Text)
     group_leader = Column(Boolean)
     group_members = Column(Text)
@@ -158,6 +144,7 @@ class VisitorProject(Base):
     researcher_discipline3 = Column(Integer, ForeignKey(Discipline.id))
     home_institution_type = Column(Text)
     home_institution_dept = Column(Text)
+    # TODO: fk?
     home_institution_name = Column(Text)
     home_institution_town = Column(Text)
     home_institution_country = Column(Integer, ForeignKey(Country.id))
@@ -169,3 +156,13 @@ class VisitorProject(Base):
     # TODO: there's no data in this column in any of the synth databases, do we need it?
     travel_and_subsistence_reimbursed = Column(Text)
     job_title = Column(Text)
+
+
+class AccessRequest(Base):
+    __tablename__ = 'AccessRequest'
+
+    id = Column(Integer, primary_key=True)
+    installation_facility_id = Column(Integer, ForeignKey(InstallationFacility.id))
+    days_requested = Column(Integer)
+    request_detail = Column(Text)
+    visitor_project_id = Column(Integer, ForeignKey(VisitorProject.id))

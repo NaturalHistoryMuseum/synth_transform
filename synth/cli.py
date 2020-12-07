@@ -135,9 +135,4 @@ def dump(context, filename):
 
 if __name__ == '__main__':
     # for dev!
-    # generate(obj=setup(get_here().parent / 'config.yml'))
-    # rebuild(obj=setup(get_here().parent / 'config.yml'))
-    # update(obj=setup(get_here().parent / 'config.yml'))
-    # results(obj=setup(get_here().parent / 'config.yml'))
-    # dump(obj=setup(get_here().parent / 'config.yml'))
     synth()
