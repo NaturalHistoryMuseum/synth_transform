@@ -46,6 +46,7 @@ def etl_steps(with_data=True):
             FillInstitutionTable,
             FillInstallationFacilityTable,
             FillAccessRequestTable,
+            CreateProjectAccessRequestsView,
         )])
 
     return steps
@@ -642,3 +643,26 @@ class FillAccessRequestTable(Step):
                                      installation_facility_id=row.InstallationFacility_ID,
                                      days_requested=row.DaysRequested,
                                      request_detail=row.RequestDetail))
+
+
+class CreateProjectAccessRequestsView(Step):
+
+    @property
+    def message(self):
+        return 'Create vw_project_access_requests view'
+
+    def run(self, context, target, *synth_sources):
+        '''
+        Create the vw_project_access_requests view in the target database.
+        '''
+        sql = '''
+        create view vw_project_access_requests as
+            select ar.visitor_project_id                        as visitor_project_id,
+                   count(distinct ar.id)                        as sub_installation_requests,
+                   sum(ar.days_requested)                       as project_days_requested,
+                   if((count(distinct ar.id) = 1), false, true) as multi_access_flag
+            from (AccessRequest ar
+                     left join VisitorProject vp on ((ar.visitor_project_id = vp.id)))
+            group by ar.visitor_project_id;
+        '''
+        target.execute(sql)
