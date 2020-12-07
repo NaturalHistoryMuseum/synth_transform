@@ -1,6 +1,7 @@
 import abc
 import enum
 import re
+import statistics
 import warnings
 from collections import defaultdict
 from contextlib import contextmanager
@@ -133,6 +134,48 @@ def get_synth_round(call_id, target):
     """
     call = target.query(Call).filter(Call.id == call_id).one()
     return SynthRound(call.round_id)
+
+
+class ScoreStats:
+    """
+    Class that encapsulates and calculates the statistics we want to put in the analysis database
+    using the evaluation scores from the source synth database for a project.
+    """
+
+    def __init__(self, scores):
+        """
+        :param scores: a list of NHMApplicationScore objects for a project
+        """
+        self.scores = scores
+
+    def aggregate(self, column, aggregation_function, min_size=1):
+        """
+        Helper function which collects the all the data points from the given column and applies the
+        given statistical function to them, returning the result. If the number of values for the
+        given column isn't at least the min_size parameter None is returned instead.
+
+        :param column: the column of data points to aggregate
+        :param aggregation_function: the aggregation function to run on the data points
+        :param min_size: the minimum number of data points that must be available, defaults to 1
+        :return: None if there weren't enough data points or the value returned by the
+                 aggregation_function
+        """
+        data = list(filter(None, (getattr(score, column.name, None) for score in self.scores)))
+        if len(data) < min_size:
+            return None
+        return aggregation_function(data)
+
+    def mean(self, column):
+        return self.aggregate(column, statistics.mean)
+
+    def mode(self, column):
+        return self.aggregate(column, statistics.mode)
+
+    def sum(self, column):
+        return self.aggregate(column, sum)
+
+    def std_dev(self, column):
+        return self.aggregate(column, statistics.stdev, min_size=2)
 
 
 @contextmanager

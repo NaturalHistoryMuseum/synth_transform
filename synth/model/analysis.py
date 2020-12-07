@@ -1,6 +1,6 @@
 # coding: utf-8
 from sqlalchemy import Column, DateTime, Integer, Text, Boolean, String, ForeignKey, \
-    BigInteger
+    BigInteger, Float
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -156,6 +156,34 @@ class VisitorProject(Base):
     # TODO: there's no data in this column in any of the synth databases, do we need it?
     travel_and_subsistence_reimbursed = Column(Text)
     job_title = Column(Text)
+    methodology_score_mean = Column(Float)
+    methodology_score_mode = Column(Float)
+    methodology_score_sum = Column(Float)
+    methodology_score_std_dev = Column(Float)
+    research_excellence_score_mean = Column(Float)
+    research_excellence_score_mode = Column(Float)
+    research_excellence_score_sum = Column(Float)
+    research_excellence_score_std_dev = Column(Float)
+    support_stmt_score_mean = Column(Float)
+    support_stmt_score_mode = Column(Float)
+    support_stmt_score_sum = Column(Float)
+    support_stmt_score_std_dev = Column(Float)
+    justification_score_mean = Column(Float)
+    justification_score_mode = Column(Float)
+    justification_score_sum = Column(Float)
+    justification_score_std_dev = Column(Float)
+    expected_gains_score_mean = Column(Float)
+    expected_gains_score_mode = Column(Float)
+    expected_gains_score_sum = Column(Float)
+    expected_gains_score_std_dev = Column(Float)
+    scientific_merit_score_mean = Column(Float)
+    scientific_merit_score_mode = Column(Float)
+    scientific_merit_score_sum = Column(Float)
+    scientific_merit_score_std_dev = Column(Float)
+    societal_challenge_score_mean = Column(Float)
+    societal_challenge_score_mode = Column(Float)
+    societal_challenge_score_sum = Column(Float)
+    societal_challenge_score_std_dev = Column(Float)
 
 
 class AccessRequest(Base):

@@ -15,10 +15,11 @@ from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output, \
     VisitorProject, Category, Institution, InstallationFacility, AccessRequest
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
-    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
+    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser, \
+    NHMApplicationScore
 from synth.resources import Resource, RegisterResourcesStep
 from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution, \
-    get_synth_round
+    get_synth_round, ScoreStats
 
 
 def etl_steps(with_data=True):
@@ -453,11 +454,6 @@ class FillVisitorProjectTable(Step):
         """
         Fill the monster VisitorProject table with data. This data is a mix of stuff from the source
         projects and users tables (TListOfUserProject and TListOfUser).
-
-        :param context:
-        :param target:
-        :param synth_sources:
-        :return:
         """
         users = context.resources[Resource.USERS]
         institution_lookup = context.resources[Resource.INSTITUTIONS].data
@@ -484,6 +480,14 @@ class FillVisitorProjectTable(Step):
                     continue
 
                 user = source.query(TListOfUser).get(project.User_ID)
+
+                # instead of maintaining all the evaluation scores for each project we generate some
+                # stats about them instead. Here we fetch the evaluation scores for this project and
+                # then create a ScoreStats object to crunch the numbers later
+                raw_scores = source.query(NHMApplicationScore) \
+                    .filter(NHMApplicationScore.UserProject_ID == project.UserProject_ID) \
+                    .all()
+                scores = ScoreStats(raw_scores)
 
                 # work out which call the project was submitted against
                 call_submitted = calls[int(project.Call_Submitted) - 1].id
@@ -557,7 +561,58 @@ class FillVisitorProjectTable(Step):
                     nationality_other=user.Nationality_OtherText,
                     remote_user=user.Remote_user,
                     travel_and_subsistence_reimbursed=user.Travel_and_Subsistence_reimbursed,
-                    job_title=user.jobTitle
+                    job_title=user.jobTitle,
+
+                    ############ evaluation scores ############
+                    methodology_score_mean=scores.mean(NHMApplicationScore.Methodology_Score),
+                    methodology_score_mode=scores.mode(NHMApplicationScore.Methodology_Score),
+                    methodology_score_sum=scores.sum(NHMApplicationScore.Methodology_Score),
+                    methodology_score_std_dev=scores.std_dev(NHMApplicationScore.Methodology_Score),
+
+                    research_excellence_score_mean=scores.mean(
+                        NHMApplicationScore.Research_Excellence_Score),
+                    research_excellence_score_mode=scores.mode(
+                        NHMApplicationScore.Research_Excellence_Score),
+                    research_excellence_score_sum=scores.sum(
+                        NHMApplicationScore.Research_Excellence_Score),
+                    research_excellence_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Research_Excellence_Score),
+
+                    support_stmt_score_mean=scores.mean(NHMApplicationScore.Support_Stmt_Score),
+                    support_stmt_score_mode=scores.mode(NHMApplicationScore.Support_Stmt_Score),
+                    support_stmt_score_sum=scores.sum(NHMApplicationScore.Support_Stmt_Score),
+                    support_stmt_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Support_Stmt_Score),
+
+                    justification_score_mean=scores.mean(NHMApplicationScore.Justification_Score),
+                    justification_score_mode=scores.mode(NHMApplicationScore.Justification_Score),
+                    justification_score_sum=scores.sum(NHMApplicationScore.Justification_Score),
+                    justification_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Justification_Score),
+
+                    expected_gains_score_mean=scores.mean(NHMApplicationScore.Expected_Gains_Score),
+                    expected_gains_score_mode=scores.mode(NHMApplicationScore.Expected_Gains_Score),
+                    expected_gains_score_sum=scores.sum(NHMApplicationScore.Expected_Gains_Score),
+                    expected_gains_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Expected_Gains_Score),
+
+                    scientific_merit_score_mean=scores.mean(
+                        NHMApplicationScore.Scientific_Merit_Score),
+                    scientific_merit_score_mode=scores.mode(
+                        NHMApplicationScore.Scientific_Merit_Score),
+                    scientific_merit_score_sum=scores.sum(
+                        NHMApplicationScore.Scientific_Merit_Score),
+                    scientific_merit_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Scientific_Merit_Score),
+
+                    societal_challenge_score_mean=scores.mean(
+                        NHMApplicationScore.Societal_Challenge_Score),
+                    societal_challenge_score_mode=scores.mode(
+                        NHMApplicationScore.Societal_Challenge_Score),
+                    societal_challenge_score_sum=scores.sum(
+                        NHMApplicationScore.Societal_Challenge_Score),
+                    societal_challenge_score_std_dev=scores.std_dev(
+                        NHMApplicationScore.Societal_Challenge_Score)
                 )
 
                 target.add(visitor_project)
