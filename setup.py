@@ -8,6 +8,7 @@ setup(
         'click~=7.1.2',
         'click-pathlib~=2020.3.13.0',
         'crossrefapi~=1.5.0',
+        'geonamescache==1.2.0',
         'pandas~=1.1.4',
         'pycountry~=20.7.3',
         'pymysql~=0.10.0',

@@ -2,7 +2,9 @@ import itertools
 import subprocess
 from datetime import datetime
 from numbers import Number
+from operator import itemgetter
 
+import geonamescache
 import pycountry
 from sqlalchemy import create_engine, func
 from sqlalchemy.schema import CreateTable
@@ -15,7 +17,8 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
 from synth.resources import Resource, RegisterResourcesStep
-from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution
+from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution, \
+    get_synth_round
 
 
 def etl_steps(with_data=True):
@@ -47,6 +50,7 @@ def etl_steps(with_data=True):
             FillInstallationFacilityTable,
             FillAccessRequestTable,
             CreateProjectAccessRequestsView,
+            FillMissingCountryData,
         )])
 
     return steps
@@ -152,6 +156,7 @@ class ClearAnalysisDB(Step):
     def run(self, context, *args, **kwargs):
         if database_exists(context.config.target):
             engine = create_engine(context.config.target)
+            engine.execute('drop view if exists vw_project_access_requests;')
             analysis.Base.metadata.drop_all(engine)
 
 
@@ -666,3 +671,101 @@ class CreateProjectAccessRequestsView(Step):
             group by ar.visitor_project_id;
         '''
         target.execute(sql)
+
+
+class FillMissingCountryData(Step):
+
+    def __init__(self):
+        self.cities = []
+        # initialise the cities dict into a more useful form
+        for city in geonamescache.GeonamesCache().get_cities().values():
+            # lowercase all the names
+            names = {city['name'].lower()}
+            names.update(n.lower() for n in city['alternatenames'])
+            self.cities.append((names, city))
+
+    @property
+    def message(self):
+        return 'Fill missing countries from VisitorProject table using cities'
+
+    def find_cities(self, town):
+        """
+        Given a town name, return a list of city dicts that have this name associated with them.
+
+        :param town: the town name
+        :return: a list of dicts of city data from geonamescache
+        """
+        return [city for names, city in self.cities if town.strip().lower() in names]
+
+    def find_country_code(self, visitor_project, manually_mapped):
+        """
+        Given a VisitorProject object, attempt find out which country the object's
+        home_institution_town is from. If a match is found, return the country code.
+
+        The manually_mapped parameter should be a dict of town/city names -> country codes which can
+        be used to skip the search through the geonamescache cities list. This is useful when the
+        town/city isn't in the geonamescache list or is ambiguous and not resolvable by using
+        population. See the data file unmatched_home_institutions.json.
+
+        :param visitor_project: a VisitorProject object
+        :param manually_mapped: a dict of town/city names -> country codes
+        :return: a country code or None if no country code could be mapped
+        """
+        town = visitor_project.home_institution_town
+
+        if town in manually_mapped:
+            return manually_mapped[town]
+
+        candidates = self.find_cities(town)
+
+        if not candidates:
+            # these delimiters cover off common uses like "Town, Country", "Town - Country", and
+            # "Town. Country"
+            for delimiter in (', ', ' - ', '. '):
+                split = town.split(delimiter)
+                if len(split) > 1:
+                    candidates = self.find_cities(split[0])
+                    if candidates:
+                        break
+            else:
+                return None
+
+        # we found a single match, huzzah
+        if len(candidates) == 1:
+            return candidates[0]['countrycode']
+
+        # we found more than one match, ruh roh
+        if len(candidates) > 1:
+            # first check to see if all the matches are from the same country
+            all_country_codes = {c["countrycode"] for c in candidates}
+            if len(all_country_codes) == 1:
+                # they are all from the same country, that's fine by us!
+                return candidates[0]['countrycode']
+
+            # in all but one case, the cities that had ambiguous matches in the geonamescache lib's
+            # list were correctly identified if you selected the one with the largest population -
+            # for example "Moscow" should match to Moscow, Russia, not Moscow, USA. The only
+            # instance where this didn't work as Islamabad which, in the data we have, was
+            # incorrectly matched to Bangladesh rather than Pakistan, as Islamabad in Bangladesh had
+            # a higher population. Dang it!
+            largest_city = sorted(candidates, key=itemgetter('population'))[-1]
+            return largest_city['countrycode']
+
+        return None
+
+    def run(self, context, target, *synth_sources):
+        """
+        Goes through the rows in the VisitorProject and attempts to fill in the
+        home_institution_country field based on the home_institution_town field if the
+        home_institution_country is empty.
+        """
+        manually_mapped = context.resources[Resource.UNMATCHEDHOMEINSTITUTIONS].data
+
+        for visitor_project in target.query(VisitorProject):
+            if not visitor_project.home_institution_country and \
+                    visitor_project.home_institution_town:
+                country_code = self.find_country_code(visitor_project, manually_mapped)
+                if country_code is not None:
+                    synth_round = get_synth_round(visitor_project.call_submitted, target)
+                    country_id = context.translate(CountryIsoCode, country_code, synth_round)
+                    visitor_project.home_institution_country = country_id

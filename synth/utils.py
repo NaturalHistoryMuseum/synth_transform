@@ -11,6 +11,8 @@ from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from synth.model.analysis import Call
+
 
 @enum.unique
 class SynthRound(enum.IntEnum):
@@ -119,6 +121,18 @@ def clean_institution(lookup, institution):
         return None if match == 'nil' else match
 
     return institution
+
+
+def get_synth_round(call_id, target):
+    """
+    Given a Call ID, return the associated SynthRound enum.
+
+    :param call_id: the Call ID
+    :param target: the target database to query (should be the analysis database)
+    :return: an SynthRound enum value
+    """
+    call = target.query(Call).filter(Call.id == call_id).one()
+    return SynthRound(call.round_id)
 
 
 @contextmanager
