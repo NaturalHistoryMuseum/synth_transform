@@ -93,7 +93,7 @@ class DumpAnalysisDatabase(Step):
 
     @property
     def message(self):
-        return 'Generates a dump of the analysis database using mysqldump'
+        return 'Generates a dump of the complete analysis database'
 
     @staticmethod
     def serialise(value):
