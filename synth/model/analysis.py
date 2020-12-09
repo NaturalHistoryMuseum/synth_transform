@@ -156,34 +156,6 @@ class VisitorProject(Base):
     # TODO: there's no data in this column in any of the synth databases, do we need it?
     travel_and_subsistence_reimbursed = Column(Text)
     job_title = Column(Text)
-    methodology_score_mean = Column(Float)
-    methodology_score_mode = Column(Float)
-    methodology_score_sum = Column(Float)
-    methodology_score_std_dev = Column(Float)
-    research_excellence_score_mean = Column(Float)
-    research_excellence_score_mode = Column(Float)
-    research_excellence_score_sum = Column(Float)
-    research_excellence_score_std_dev = Column(Float)
-    support_stmt_score_mean = Column(Float)
-    support_stmt_score_mode = Column(Float)
-    support_stmt_score_sum = Column(Float)
-    support_stmt_score_std_dev = Column(Float)
-    justification_score_mean = Column(Float)
-    justification_score_mode = Column(Float)
-    justification_score_sum = Column(Float)
-    justification_score_std_dev = Column(Float)
-    expected_gains_score_mean = Column(Float)
-    expected_gains_score_mode = Column(Float)
-    expected_gains_score_sum = Column(Float)
-    expected_gains_score_std_dev = Column(Float)
-    scientific_merit_score_mean = Column(Float)
-    scientific_merit_score_mode = Column(Float)
-    scientific_merit_score_sum = Column(Float)
-    scientific_merit_score_std_dev = Column(Float)
-    societal_challenge_score_mean = Column(Float)
-    societal_challenge_score_mode = Column(Float)
-    societal_challenge_score_sum = Column(Float)
-    societal_challenge_score_std_dev = Column(Float)
 
 
 class AccessRequest(Base):
@@ -194,3 +166,16 @@ class AccessRequest(Base):
     days_requested = Column(Integer)
     request_detail = Column(Text)
     visitor_project_id = Column(Integer, ForeignKey(VisitorProject.id))
+
+
+class EvaluationScore(Base):
+    __tablename__ = 'EvaluationScore'
+
+    id = Column(Integer, primary_key=True)
+    visitor_project_id = Column(Integer, ForeignKey(VisitorProject.id))
+    name = Column(Text)
+    count = Column(Integer)
+    mean = Column(Float)
+    mode = Column(Float)
+    sum = Column(Float)
+    std_dev = Column(Float)
