@@ -1,9 +1,7 @@
 # Synth Transform
 
 ![python versions](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)
-
-_This project is under active development!_
-
+[![DOI](https://zenodo.org/badge/293545550.svg)](https://zenodo.org/badge/latestdoi/293545550)
 
 ## Overview
 
