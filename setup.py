@@ -15,7 +15,6 @@ setup(
         'pymysql[rsa]~=0.10.0',
         'PyYAML~=5.3.1',
         'requests>=2.11.1',
-        'seaborn~=0.11.0',
         'sqlacodegen~=2.3.0',
         'SQLAlchemy~=1.3.19',
         'sqlalchemy-utils~=0.36.8',
