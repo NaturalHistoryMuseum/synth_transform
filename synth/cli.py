@@ -6,7 +6,6 @@ import yaml
 
 from synth.etl import etl_steps, GenerateSynthDatabaseModel, DumpAnalysisDatabase
 from synth.resources import RegisterResourcesStep, update_resources_tasks, Resource
-from synth.results import UpdateResultStep, CSVChartStep
 from synth.utils import Context, Config
 
 
@@ -89,36 +88,6 @@ def update(context, names):
     # registered and therefore we can't (sadly!) just call run_steps once because the steps in the
     # below line are generated from the effects of the above line
     context.run_steps(update_resources_tasks(context, *(Resource[name.upper()] for name in names)))
-
-
-@synth.command()
-@click.option('-n', '--name', 'names', help='The name of the sql file to run', type=str,
-              multiple=True)
-@click.pass_obj
-def results(context, names):
-    """
-    Updates the csvs and charts in the results folder by running the sql against the analysis
-    database, updating the CSV and then regenerating any dependant charts. If no names are provided
-    then all results are updated.
-    """
-    def is_name_allowed(name):
-        return not names or name in names
-
-    results_path = get_here() / 'results'
-    steps = []
-
-    # first, read the database and write the csvs
-    for sql_file in results_path.glob('**/*.sql'):
-        if is_name_allowed(sql_file.stem):
-            steps.append(UpdateResultStep(sql_file))
-
-    # then create any charts
-    for chart_step_class in CSVChartStep.__subclasses__():
-        chart_step = chart_step_class(results_path)
-        if is_name_allowed(chart_step.csv_file.stem):
-            steps.append(chart_step)
-
-    context.run_steps(steps)
 
 
 @synth.command()
