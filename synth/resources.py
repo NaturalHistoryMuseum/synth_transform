@@ -7,9 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
+import pandas as pd
 import requests
 from crossref.restful import Works, Etiquette
 from fuzzywuzzy import fuzz
+from pandas import ExcelWriter
 from sqlalchemy import or_
 from sqlitedict import SqliteDict
 from tqdm.contrib.concurrent import thread_map
@@ -27,6 +29,8 @@ class Resource(enum.Enum):
     DOIS = 'dois'
     DOIMETADATA = 'doimetadata'
     USERS = 'users'
+    ACCESSREQUESTREBUILD = 'accessrequestrebuild'
+    UNMATCHEDHOMEINSTITUTIONS = 'unmatchedhomeinstitutions'
 
 
 class DataResource(abc.ABC):
@@ -126,6 +130,23 @@ class SqliteDataResource(DataResource, abc.ABC):
         self.data.commit()
         self.data.close()
         self.data = None
+
+
+class XLSXDataResource(DataResource):
+
+    def __init__(self, context, path):
+        super().__init__(context)
+        self.path = path
+        self.data = {}
+
+    def load(self, context, target, synth1, synth2, synth3, synth4):
+        if self.path.exists():
+            self.data = pd.read_excel(self.path, sheet_name=None)
+
+    def update(self, context, target, synth1, synth2, synth3, synth4):
+        with ExcelWriter(self.path) as writer:
+            for sheet_name, data in self.data:
+                data.to_excel(writer, sheet_name=sheet_name)
 
 
 class Institutions(JSONDataResource):
@@ -472,6 +493,34 @@ class Users(DataResource):
         return self.data[user_guid][Users.Columns.age_column(synth_round)]
 
 
+class AccessRequestRebuild(XLSXDataResource):
+
+    def __init__(self, context):
+        super().__init__(context, DataResource.data_dir / 'access_request_rebuild.xlsx')
+
+    @property
+    def access_requests(self):
+        return self.data['AccessRequest']
+
+    @property
+    def installation_facility(self):
+        return self.data['InstallationFacility']
+
+    @property
+    def category(self):
+        return self.data['Category']
+
+    @property
+    def institution(self):
+        return self.data['Institution']
+
+
+class UnmatchedHomeInstitutions(JSONDataResource):
+
+    def __init__(self, context):
+        super().__init__(context, self.data_dir / 'unmatched_home_institutions.json')
+
+
 class RegisterResourcesStep(Step):
     """
     This step registers and loads all the resources we know about into the context.
@@ -487,7 +536,9 @@ class RegisterResourcesStep(Step):
             (Resource.INSTITUTIONS, Institutions(context)),
             (Resource.DOIS, OutputDOIs(context)),
             (Resource.DOIMETADATA, DOIMetadata(context)),
-            (Resource.USERS, Users(context))
+            (Resource.USERS, Users(context)),
+            (Resource.ACCESSREQUESTREBUILD, AccessRequestRebuild(context)),
+            (Resource.UNMATCHEDHOMEINSTITUTIONS, UnmatchedHomeInstitutions(context)),
         ))
         for resource in resources.values():
             resource.load(context, *args, **kwargs)

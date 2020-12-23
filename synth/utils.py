@@ -1,7 +1,7 @@
 import abc
-import csv
 import enum
 import re
+import statistics
 import warnings
 from collections import defaultdict
 from contextlib import contextmanager
@@ -9,8 +9,10 @@ from datetime import datetime
 
 import click
 from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from synth.model.analysis import Call
 
 
 @enum.unique
@@ -97,8 +99,104 @@ def to_datetime(value, date_format='%a %b %d %H:%M:%S %Z %Y'):
     """
     if not value:
         return None
-    # Wed Sep 15 10:36:54 BST 2004
     return datetime.strptime(value, date_format)
+
+
+def clean_institution(lookup, institution):
+    """
+    Given the institutions resource and an institution name, clean up the passed name and attempt
+    to match it to the lookup in case we have a cleaner version.
+
+    If no cleaner version exists in the lookup then the name (with html bits removed) is returned.
+
+    :param lookup: the data of Institutions resource (should be a dict)
+    :param institution: the candidate institution name
+    :return: the cleaned version of the name
+    """
+    if institution is None:
+        return None
+
+    institution = clean_string(institution)
+    if institution in lookup:
+        match = lookup[institution]
+        return None if match == 'nil' else match
+
+    return institution
+
+
+def get_synth_round(call_id, target):
+    """
+    Given a Call ID, return the associated SynthRound enum.
+
+    :param call_id: the Call ID
+    :param target: the target database to query (should be the analysis database)
+    :return: an SynthRound enum value
+    """
+    call = target.query(Call).filter(Call.id == call_id).one()
+    return SynthRound(call.round_id)
+
+
+def build_score_totals(default, one=None, two=None, three=None, four=None):
+    """
+    Given the maximum score totals for each synth round and a default, return a dict mapping each
+    SynthRound to the given score total or the default if no score is specified. This allows a given
+    score type to have a different total in different rounds.
+
+    :param default: the default value to use when the any of the round's totals aren't specified
+    :param one: the round SynthRound.ONE score total
+    :param two: the round SynthRound.TWO score total
+    :param three: the round SynthRound.THREE score total
+    :param four: the round SynthRound.FOUR score total
+    :return: a dict of SynthRound -> integer score total
+    """
+    return {synth_round: param if param is not None else default
+            for synth_round, param in zip(SynthRound, [one, two, three, four])}
+
+
+class ScoreStats:
+    """
+    Class that encapsulates and calculates the statistics we want to put in the analysis database
+    using the evaluation scores from the source synth database for a project.
+    """
+
+    def __init__(self, scores):
+        """
+        :param scores: a list of NHMApplicationScore objects for a project
+        """
+        self.scores = scores
+
+    def aggregate(self, column, total, aggregation_function, min_size=1):
+        """
+        Helper function which collects the all the data points from the given column and applies the
+        given statistical function to them, returning the result. If the number of values for the
+        given column isn't at least the min_size parameter None is returned instead.
+
+        :param column: the column of data points to aggregate
+        :param total: the total this score is marked out of
+        :param aggregation_function: the aggregation function to run on the data points
+        :param min_size: the minimum number of data points that must be available, defaults to 1
+        :return: None if there weren't enough data points or the value returned by the
+                 aggregation_function
+        """
+        data = list(filter(None, (getattr(score, column.name, None) for score in self.scores)))
+        if len(data) < min_size:
+            return None
+        return aggregation_function([point / total for point in data])
+
+    def count(self, column, total):
+        return self.aggregate(column, total, len, min_size=0)
+
+    def mean(self, column, total):
+        return self.aggregate(column, total, statistics.mean)
+
+    def mode(self, column, total):
+        return self.aggregate(column, total, statistics.mode)
+
+    def sum(self, column, total):
+        return self.aggregate(column, total, sum)
+
+    def std_dev(self, column, total):
+        return self.aggregate(column, total, statistics.stdev, min_size=2)
 
 
 @contextmanager
@@ -194,6 +292,10 @@ class Context:
         :return: the new value that the original value maps to or the default if no mapping is found
         """
         return self.mappings[source_table].get((synth_round, original), default)
+
+    def reverse(self, source_table, new, synth_round, default=None):
+        return next((original for (sr, original), value in self.mappings[source_table].items() if
+                     value == new and sr == synth_round), default)
 
     def run_steps(self, steps):
         """

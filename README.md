@@ -1,9 +1,7 @@
 # Synth Transform
 
 ![python versions](https://img.shields.io/badge/python-3.6%20%7C%203.7%20%7C%203.8-blue)
-
-_This project is under active development!_
-
+[![DOI](https://zenodo.org/badge/293545550.svg)](https://zenodo.org/badge/latestdoi/293545550)
 
 ## Overview
 
@@ -106,7 +104,6 @@ database.
 To do this it drops and recreates all the tables in the analytics database and then runs a series of
 steps to copy the data over, transforming it as it goes.
 
-
 #### `update`
 ```bash
 synth update
@@ -126,18 +123,6 @@ The names of the resources are listed below in the [_Supplementary Data_](#suppl
 section.
 
 
-#### `results`
-```bash
-synth results
-synth results --name <name>
-synth results --name <name> --name <name> ...
-```
-
-Updates the results data.
-It is possible to specify which results to update using the `--name` option which can be specified
-multiple times to only update a set of names.
-
-
 #### `dump`
 ```bash
 synth dump
@@ -155,6 +140,7 @@ source.
 | file | name | source | updatable? |
 | ---- | ---- | ------ | ---------- |
 | `master_clean.json` | `institutions` | This file comes from [https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json](https://github.com/Vizzuality/Synthesys3/blob/master/Data/master_clean.json) and provides a mapping between some dirty Synthesys place data and clean versions of places. | Yes, though only by pulling the latest version from GitHub which is unlikely to be updated at this point |
-| `output_dois.json` | `dois` | This file is generated using the Crossref API. We iterate over all of the DOIs we can find in the `NHM_Output` tables in the source synth databases, retrieve the DOI metadata from Crossref and then store it in this cache file. Updating this file can take 20+ mins. | Yes |
+| `doi_metadata.db` | `doimetadata` | This database is generated using the Crossref API. We iterate over all of the DOIs we can find in the `NHM_Output` tables in the source synth databases, retrieve the DOI metadata from Crossref and then store it in this cache database. Updating this database can take 20+ mins. | Yes |
 | `users.csv` | `users` | A CSV of PII safe user data which we can use to match users across the source synth databases. | No, only manually updatable |
-
+| `access_request_rebuild.xlsx` | `accessrequestrebuild` | An Excel spreadsheet created by Sarah Vincent which aggregates together the data in the Facilities and Institutions tables from the source synth databases. | No, only manually updatable |
+| `output_dois.db` | `dois` | This resource is a cached set of output IDs matched to DOIs using regexes, URLs, Crossref searches, and Refindit searches. This resource takes several hours to update, depending on throttling from Crossref and number of threads available for multiprocessing. | Yes |

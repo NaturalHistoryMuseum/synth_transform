@@ -3,7 +3,9 @@ import json
 import subprocess
 from datetime import datetime
 from numbers import Number
+from operator import itemgetter
 
+import geonamescache
 import pycountry
 from sqlalchemy import create_engine, func
 from sqlalchemy.schema import CreateTable
@@ -12,11 +14,13 @@ from sqlalchemy_utils import create_database, database_exists
 from synth.errors import SpecificDisciplineParentMismatch
 from synth.model import analysis
 from synth.model.analysis import Round, Call, Country, Discipline, SpecificDiscipline, Output, \
-    VisitorProject
+    VisitorProject, Category, Institution, InstallationFacility, AccessRequest, EvaluationScore
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
-    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
+    CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, \
+    TListOfUser, NHMApplicationScore
 from synth.resources import Resource, RegisterResourcesStep, DataResource
-from synth.utils import Step, SynthRound, clean_string, to_datetime
+from synth.utils import Step, SynthRound, clean_string, to_datetime, clean_institution, \
+    get_synth_round, ScoreStats, build_score_totals
 
 
 def etl_steps(with_data=True):
@@ -43,6 +47,13 @@ def etl_steps(with_data=True):
             FillOutputTable,
             CleanOutputsTable,
             FillVisitorProjectTable,
+            FillCategoryTable,
+            FillInstitutionTable,
+            FillInstallationFacilityTable,
+            FillAccessRequestTable,
+            CreateProjectAccessRequestsView,
+            FillMissingCountryData,
+            AggregateEvaluationScores,
         )])
 
     return steps
@@ -83,7 +94,7 @@ class DumpAnalysisDatabase(Step):
 
     @property
     def message(self):
-        return 'Generates a dump of the analysis database using mysqldump'
+        return 'Generates a dump of the complete analysis database'
 
     @staticmethod
     def serialise(value):
@@ -148,6 +159,7 @@ class ClearAnalysisDB(Step):
     def run(self, context, *args, **kwargs):
         if database_exists(context.config.target):
             engine = create_engine(context.config.target)
+            engine.execute('drop view if exists vw_project_access_requests;')
             analysis.Base.metadata.drop_all(engine)
 
 
@@ -423,7 +435,8 @@ class CleanOutputsTable(Step):
                                                   Output.title != ''):
             output.title = clean_string(output.title)
 
-        # update from the cached matched DOIs and metadata (recommended that the update methods are run before this)
+        # update from the cached matched DOIs and metadata (recommended that the update methods are
+        # run before this)
         with doi_cache, metadata_cache:
             mapped_items = doi_cache.mapped_items(context.mappings[NHMOutput])
             for output in target.query(Output).filter(Output.id.in_(mapped_items.keys())):
@@ -446,13 +459,10 @@ class FillVisitorProjectTable(Step):
         """
         Fill the monster VisitorProject table with data. This data is a mix of stuff from the source
         projects and users tables (TListOfUserProject and TListOfUser).
-
-        :param context:
-        :param target:
-        :param synth_sources:
-        :return:
         """
         users = context.resources[Resource.USERS]
+        institution_lookup = context.resources[Resource.INSTITUTIONS].data
+        id_generator = itertools.count(1)
 
         for synth_round, source in zip(SynthRound, synth_sources):
             # grab only the projects that have been "completed"
@@ -479,7 +489,13 @@ class FillVisitorProjectTable(Step):
                 # work out which call the project was submitted against
                 call_submitted = calls[int(project.Call_Submitted) - 1].id
 
+                visitor_project_id = next(id_generator)
+
+                context.map(TListOfUserProject, project.UserProject_ID, visitor_project_id,
+                            synth_round)
+
                 visitor_project = VisitorProject(
+                    id=visitor_project_id,
                     ############ project based info ############
                     title=project.UserProject_Title,
                     objectives=project.UserProject_Objectives,
@@ -506,7 +522,8 @@ class FillVisitorProjectTable(Step):
                     previous_application=bool(project.Previous_Application),
                     training_requirement=project.Training_Requirement,
                     # TODO: should use lookup and get id for?
-                    supporter_institution=project.Supporter_Institution,
+                    supporter_institution=clean_institution(institution_lookup,
+                                                            project.Supporter_Institution),
                     administration_state=project.Administration_State,
                     group_leader=bool(project.Group_leader),
                     group_members=project.Group_Members,
@@ -515,7 +532,8 @@ class FillVisitorProjectTable(Step):
                     expectations=project.UserProject_Expectations,
                     outputs=project.UserProject_Outputs,
                     # TODO: should use lookup and get id for?
-                    group_leader_institution=project.Group_Leader_Institution,
+                    group_leader_institution=clean_institution(institution_lookup,
+                                                               project.Group_Leader_Institution),
                     visit_funded_previously=project.Visit_Funded_Previously,
 
                     ############ user based info ############
@@ -528,7 +546,8 @@ class FillVisitorProjectTable(Step):
                     researcher_discipline3=user.Discipline3,
                     home_institution_type=user.Home_Institution_Type,
                     home_institution_dept=user.Home_Institution_Dept,
-                    home_institution_name=user.Home_Institution_Name,
+                    home_institution_name=clean_institution(institution_lookup,
+                                                            user.Home_Institution_Name),
                     home_institution_town=user.Home_Institution_Town,
                     home_institution_country=context.translate(CountryIsoCode,
                                                                user.Home_Institution_Country_code,
@@ -539,7 +558,267 @@ class FillVisitorProjectTable(Step):
                     nationality_other=user.Nationality_OtherText,
                     remote_user=user.Remote_user,
                     travel_and_subsistence_reimbursed=user.Travel_and_Subsistence_reimbursed,
-                    job_title=user.jobTitle
+                    job_title=user.jobTitle,
                 )
 
                 target.add(visitor_project)
+
+
+class FillCategoryTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Category table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the category table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].category
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(Category(id=row.Category_ID, name=row.CategoryName,
+                                higherName=row.HigherCategoryName))
+
+
+class FillInstitutionTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill Institution table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the institution table with the data from the access_request_rebuild.xlsx resource data
+        file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].institution
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            # lookup the country in the analysis db rather than using translate given that this code
+            # doesn't come from the database directly
+            country = target.query(Country).filter(Country.code == row.CountryCode).one()
+            target.add(Institution(id=row.Institution_ID, acronym=row.InstitutionAcronym,
+                                   name=row.InstitutionName, country_id=country.id))
+
+
+class FillInstallationFacilityTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill InstallationFacility table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the InstallationFacility table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].installation_facility
+        # loop over the rows and load them in
+        for row in data.itertuples():
+            target.add(InstallationFacility(id=row.InstallationFacility_ID,
+                                            code=row.InstallationCode,
+                                            description=row.InstallationFacilityDescription,
+                                            category_id=row.Category_ID,
+                                            institution_id=row.Institution_ID))
+
+
+class FillAccessRequestTable(Step):
+
+    @property
+    def message(self):
+        return 'Fill AccessRequest table with data'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Fill the AccessRequest table with the data from the access_request_rebuild.xlsx
+        resource data file.
+        """
+        # get the sheet as a dataframe
+        data = context.resources[Resource.ACCESSREQUESTREBUILD].access_requests
+
+        for row in data.itertuples():
+            visitor_project_id = context.translate(TListOfUserProject, row.UserProject_ID,
+                                                   row.SynthRound)
+            target.add(AccessRequest(id=row.AccessRequest_ID,
+                                     visitor_project_id=visitor_project_id,
+                                     installation_facility_id=row.InstallationFacility_ID,
+                                     days_requested=row.DaysRequested,
+                                     request_detail=row.RequestDetail))
+
+
+class CreateProjectAccessRequestsView(Step):
+
+    @property
+    def message(self):
+        return 'Create vw_project_access_requests view'
+
+    def run(self, context, target, *synth_sources):
+        '''
+        Create the vw_project_access_requests view in the target database.
+        '''
+        sql = '''
+        create view vw_project_access_requests as
+            select ar.visitor_project_id                        as visitor_project_id,
+                   count(distinct ar.id)                        as sub_installation_requests,
+                   sum(ar.days_requested)                       as project_days_requested,
+                   if((count(distinct ar.id) = 1), false, true) as multi_access_flag
+            from (AccessRequest ar
+                     left join VisitorProject vp on ((ar.visitor_project_id = vp.id)))
+            group by ar.visitor_project_id;
+        '''
+        target.execute(sql)
+
+
+class FillMissingCountryData(Step):
+
+    def __init__(self):
+        self.cities = []
+        # initialise the cities dict into a more useful form
+        for city in geonamescache.GeonamesCache().get_cities().values():
+            # lowercase all the names
+            names = {city['name'].lower()}
+            names.update(n.lower() for n in city['alternatenames'])
+            self.cities.append((names, city))
+
+    @property
+    def message(self):
+        return 'Fill missing countries from VisitorProject table using cities'
+
+    def find_cities(self, town):
+        """
+        Given a town name, return a list of city dicts that have this name associated with them.
+
+        :param town: the town name
+        :return: a list of dicts of city data from geonamescache
+        """
+        return [city for names, city in self.cities if town.strip().lower() in names]
+
+    def find_country_code(self, visitor_project, manually_mapped):
+        """
+        Given a VisitorProject object, attempt find out which country the object's
+        home_institution_town is from. If a match is found, return the country code.
+
+        The manually_mapped parameter should be a dict of town/city names -> country codes which can
+        be used to skip the search through the geonamescache cities list. This is useful when the
+        town/city isn't in the geonamescache list or is ambiguous and not resolvable by using
+        population. See the data file unmatched_home_institutions.json.
+
+        :param visitor_project: a VisitorProject object
+        :param manually_mapped: a dict of town/city names -> country codes
+        :return: a country code or None if no country code could be mapped
+        """
+        town = visitor_project.home_institution_town
+
+        if town in manually_mapped:
+            return manually_mapped[town]
+
+        candidates = self.find_cities(town)
+
+        if not candidates:
+            # these delimiters cover off common uses like "Town, Country", "Town - Country", and
+            # "Town. Country"
+            for delimiter in (', ', ' - ', '. '):
+                split = town.split(delimiter)
+                if len(split) > 1:
+                    candidates = self.find_cities(split[0])
+                    if candidates:
+                        break
+            else:
+                return None
+
+        # we found a single match, huzzah
+        if len(candidates) == 1:
+            return candidates[0]['countrycode']
+
+        # we found more than one match, ruh roh
+        if len(candidates) > 1:
+            # first check to see if all the matches are from the same country
+            all_country_codes = {c["countrycode"] for c in candidates}
+            if len(all_country_codes) == 1:
+                # they are all from the same country, that's fine by us!
+                return candidates[0]['countrycode']
+
+            # in all but one case, the cities that had ambiguous matches in the geonamescache lib's
+            # list were correctly identified if you selected the one with the largest population -
+            # for example "Moscow" should match to Moscow, Russia, not Moscow, USA. The only
+            # instance where this didn't work as Islamabad which, in the data we have, was
+            # incorrectly matched to Bangladesh rather than Pakistan, as Islamabad in Bangladesh had
+            # a higher population. Dang it!
+            largest_city = sorted(candidates, key=itemgetter('population'))[-1]
+            return largest_city['countrycode']
+
+        return None
+
+    def run(self, context, target, *synth_sources):
+        """
+        Goes through the rows in the VisitorProject and attempts to fill in the
+        home_institution_country field based on the home_institution_town field if the
+        home_institution_country is empty.
+        """
+        manually_mapped = context.resources[Resource.UNMATCHEDHOMEINSTITUTIONS].data
+
+        for visitor_project in target.query(VisitorProject):
+            if not visitor_project.home_institution_country and \
+                    visitor_project.home_institution_town:
+                country_code = self.find_country_code(visitor_project, manually_mapped)
+                if country_code is not None:
+                    synth_round = get_synth_round(visitor_project.call_submitted, target)
+                    country_id = context.translate(CountryIsoCode, country_code, synth_round)
+                    visitor_project.home_institution_country = country_id
+
+
+class AggregateEvaluationScores(Step):
+
+    @property
+    def message(self):
+        return 'Aggregate evaluation scores and then populate scores table'
+
+    def run(self, context, target, *synth_sources):
+        """
+        Populate the EvaluationScore table with aggregated project scores. Instead of migrating all
+        of the score data for each project over to the analysis database, we aggregate it per
+        project. Note that the scores are processed into a percentage of the maximum possible score
+        for that score type in that round (the maximum scores change...).
+        """
+        sources = dict(zip(SynthRound, synth_sources))
+        # each score has a column in the old database and the value held in the column is the score
+        # given by the judge to the project. Simple! However, the value in the database is out of
+        # a weighted total for each score and this weighting isn't consistent across all rounds
+        score_definitions = [
+            (NHMApplicationScore.Methodology_Score, build_score_totals(30)),
+            (NHMApplicationScore.Research_Excellence_Score, build_score_totals(10)),
+            (NHMApplicationScore.Support_Stmt_Score, build_score_totals(10)),
+            (NHMApplicationScore.Justification_Score, build_score_totals(25)),
+            (NHMApplicationScore.Expected_Gains_Score, build_score_totals(10)),
+            # in rounds 1-3 the total was 15, in round 4 it was lowered to 10
+            (NHMApplicationScore.Scientific_Merit_Score, build_score_totals(15, four=10)),
+            # this score only applies to round 4 as it wasn't used in rounds 1-3
+            (NHMApplicationScore.Societal_Challenge_Score, build_score_totals(None, four=5)),
+        ]
+
+        for visitor_project in target.query(VisitorProject):
+            synth_round = get_synth_round(visitor_project.call_submitted, target)
+            # work out which user project id this project had in the original synth source db
+            user_project_id = context.reverse(TListOfUserProject, visitor_project.id, synth_round)
+            # fetch the evaluation scores for this project and then create a ScoreStats object to
+            # crunch the numbers later
+            raw_scores = sources[synth_round].query(NHMApplicationScore) \
+                .filter(NHMApplicationScore.UserProject_ID == user_project_id) \
+                .all()
+            scores = ScoreStats(raw_scores)
+
+            for column, totals in score_definitions:
+                name = ' '.join(column.name.split('_')[:-1])
+                total = totals[synth_round]
+                target.add(EvaluationScore(visitor_project_id=visitor_project.id,
+                                           name=name,
+                                           count=scores.count(column, total),
+                                           mean=scores.mean(column, total),
+                                           mode=scores.mode(column, total),
+                                           sum=scores.sum(column, total),
+                                           std_dev=scores.std_dev(column, total)))
