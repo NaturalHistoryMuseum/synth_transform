@@ -13,6 +13,7 @@ from fuzzywuzzy import fuzz
 from sqlalchemy import or_
 from sqlitedict import SqliteDict
 from tqdm.contrib.concurrent import thread_map
+from mendeley import Mendeley
 
 from synth.errors import DuplicateUserGUIDError
 from synth.model.rco_synthsys_live import NHMOutput
@@ -249,6 +250,7 @@ class OutputDOIs(SqliteDataResource):
         try:
             authors = find_names(clean_string(output.Authors) or '')
             title = output.Title.rstrip('.')
+            # try crossref first
             q = self.works.query(author=authors, bibliographic=title).sort('relevance').order('desc')
             for ri, result in enumerate(q):
                 result_title = result.get('title', [None])[0]
@@ -277,6 +279,31 @@ class OutputDOIs(SqliteDataResource):
                         conn.add(output_key, result['DOI'].upper())
                         self._methods[output_key] = 'refindit'
                         return
+            # also try mendeley
+            mendeley = Mendeley(self.context.config.resource_opt('doi.mendeley_id'),
+                                client_secret=self.context.config.resource_opt('doi.mendeley_secret'))
+            auth = mendeley.start_client_credentials_flow()
+            mendeley_session = auth.authenticate()
+            mendeley_results = mendeley_session.catalog.advanced_search(title=title).list(page_size=5).items
+            for r in mendeley_results:
+                if r.identifiers is None:
+                    continue
+                match = fuzz.ratio(r.title.lower(), title.lower())
+                if match >= 70:
+                    doi = r.identifiers.get('doi')
+                    if doi is None:
+                        continue
+                    crossref_record = self.works.doi(r.identifiers.get('doi'))
+                    if crossref_record:
+                        result_title = crossref_record.get('title', [None])[0]
+                        if result_title is None:
+                            continue
+                        similarity = fuzz.partial_ratio(result_title, title.lower())
+                        if similarity >= 80:
+                            self._added.add(output.Output_ID)
+                            conn.add(output_key, crossref_record['DOI'].upper())
+                            self._methods[output_key] = 'mendeley'
+                            return
         except Exception as e:
             self._errors[(synth_round, output.Output_ID)] = e
 
@@ -326,8 +353,7 @@ class OutputDOIs(SqliteDataResource):
 
             # now for searching based on metadata
             title_and_author = synth_db.query(NHMOutput).filter(NHMOutput.Output_ID.notin_(self._added),
-                                                                NHMOutput.Title.isnot(None),
-                                                                NHMOutput.Authors.isnot(None))
+                                                                NHMOutput.Title.isnot(None))
 
             workers = context.config.resource_opt('dois.threads', 20)
             with self, ThreadPoolExecutor(workers) as executor:

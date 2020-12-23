@@ -1,10 +1,11 @@
 import itertools
+import json
 import subprocess
 from datetime import datetime
 from numbers import Number
 
 import pycountry
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import create_engine, func
 from sqlalchemy.schema import CreateTable
 from sqlalchemy_utils import create_database, database_exists
 
@@ -14,7 +15,7 @@ from synth.model.analysis import Round, Call, Country, Discipline, SpecificDisci
     VisitorProject
 from synth.model.rco_synthsys_live import t_NHM_Call, NHMDiscipline, NHMSpecificDiscipline, \
     CountryIsoCode, NHMOutputType, NHMPublicationStatu, NHMOutput, TListOfUserProject, TListOfUser
-from synth.resources import Resource, RegisterResourcesStep
+from synth.resources import Resource, RegisterResourcesStep, DataResource
 from synth.utils import Step, SynthRound, clean_string, to_datetime
 
 
@@ -358,6 +359,9 @@ class FillOutputTable(Step):
                     conference=output.Conference,
                     degree=output.Degree
                 ))
+
+        with open(DataResource.data_dir / 'mappings.json', 'w') as mapping_file:
+            json.dump({json.dumps(k): v for k, v in context.mappings[NHMOutput].items()}, mapping_file)
 
 
 class CleanOutputsTable(Step):

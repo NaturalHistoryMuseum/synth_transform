@@ -13,7 +13,6 @@ setup(
         'pymysql~=0.10.0',
         'pymysql[rsa]~=0.10.0',
         'PyYAML~=5.3.1',
-        'requests>=2.11.1',
         'seaborn~=0.11.0',
         'sqlacodegen~=2.3.0',
         'SQLAlchemy~=1.3.19',
@@ -25,7 +24,9 @@ setup(
         'sqlitedict~=1.7.0',
         'unidecode~=1.1.1',
         'untangle~=1.1.1',
-        'tqdm~=4.50.0'
+        'tqdm~=4.50.0',
+        'mendeley~=0.3.2',
+        'requests>=2.11.1',
     ],
     entry_points='''
         [console_scripts]
