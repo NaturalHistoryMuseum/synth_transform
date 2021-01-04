@@ -350,6 +350,8 @@ class OutputDOIs(SqliteDataResource):
                     doi_metadata = self.works.doi(doi)
                     if doi_metadata:
                         doi_title = doi_metadata.get('title', '')
+                        if doi_title is None or len(doi_title) == 0:
+                            continue
                         doi_title = clean_string(doi_title[0]).lower()
                         output_title = output.Title
                         if output_title is not None:
