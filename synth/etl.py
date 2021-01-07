@@ -493,6 +493,7 @@ class FillVisitorProjectTable(Step):
                 visitor_project = VisitorProject(
                     id=visitor_project_id,
                     ############ project based info ############
+                    original_project_id=project.UserProject_ID,
                     title=project.UserProject_Title,
                     objectives=project.UserProject_Objectives,
                     achievements=project.UserProject_Achievements,

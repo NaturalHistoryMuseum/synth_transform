@@ -101,6 +101,7 @@ class VisitorProject(Base):
     __tablename__ = 'VisitorProject'
 
     id = Column(Integer, primary_key=True)
+    original_project_id = Column(Integer)
     title = Column(Text)
     objectives = Column(Text)
     achievements = Column(Text)
